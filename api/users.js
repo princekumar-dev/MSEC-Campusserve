@@ -153,21 +153,41 @@ export default async function handler(req, res) {
         })
       }
 
-      // list users for academic system - select only needed fields
-      const users = await User.find().select('_id name email role department year section phoneNumber').sort({ createdAt: -1 }).lean()
-      // Remove sensitive fields before sending to client
-      const safe = users.map(u => ({
-        id: u._id,
-        name: u.name,
-        email: u.email,
-        role: u.role,
-        department: u.department,
-        year: u.year,
-        section: u.section,
-        phoneNumber: u.phoneNumber,
-        createdAt: u.createdAt
-      }))
-      return res.status(200).json({ success: true, users: safe })
+      // list users - ADMIN ONLY
+      if (action === 'list') {
+        if (!userId) {
+          return res.status(400).json({ success: false, error: 'userId is required' })
+        }
+
+        // Verify requesting user is an admin
+        const requestingUser = await User.findById(userId).select('_id role').lean()
+        if (!requestingUser) {
+          return res.status(401).json({ success: false, error: 'User not found' })
+        }
+
+        if (String(requestingUser.role || '').toLowerCase() !== 'admin') {
+          return res.status(403).json({ success: false, error: 'Only admin can list users' })
+        }
+
+        // Admin is authorized, fetch all users
+        const users = await User.find().select('_id name email role department year section phoneNumber').sort({ createdAt: -1 }).lean()
+        // Remove sensitive fields before sending to client
+        const safe = users.map(u => ({
+          id: u._id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          department: u.department,
+          year: u.year,
+          section: u.section,
+          phoneNumber: u.phoneNumber,
+          createdAt: u.createdAt
+        }))
+        return res.status(200).json({ success: true, users: safe })
+      }
+
+      // Default: return error if no action matched
+      return res.status(400).json({ success: false, error: 'Invalid action or missing required parameters' })
     }
 
     if (req.method === 'POST') {
@@ -411,7 +431,21 @@ export default async function handler(req, res) {
       if (!userId) return res.status(400).json({ success: false, error: 'userId required' })
 
       try {
-        const deleted = await User.findByIdAndDelete(userId)
+        // Verify requesting user is an admin
+        const requestingUser = await User.findById(userId).select('_id role').lean()
+        if (!requestingUser) {
+          return res.status(401).json({ success: false, error: 'User not found' })
+        }
+
+        if (String(requestingUser.role || '').toLowerCase() !== 'admin') {
+          return res.status(403).json({ success: false, error: 'Only admin can delete users' })
+        }
+
+        // Expect the user to delete in the query params
+        const userIdToDelete = req.query?.id
+        if (!userIdToDelete) return res.status(400).json({ success: false, error: 'id (user to delete) required' })
+
+        const deleted = await User.findByIdAndDelete(userIdToDelete)
         if (!deleted) return res.status(404).json({ success: false, error: 'User not found' })
         return res.status(200).json({ success: true, deleted: true })
       } catch (delErr) {
@@ -422,7 +456,8 @@ export default async function handler(req, res) {
 
     // PATCH endpoints for user updates
     if (req.method === 'PATCH') {
-      const { action, userId } = req.query
+      const action = req.query?.action || req.body?.action
+      const userId = req.query?.userId || req.body?.userId
       if (!action) return res.status(400).json({ success: false, error: 'action required' })
 
       if (action === 'access-policy') {
@@ -460,6 +495,50 @@ export default async function handler(req, res) {
           message: 'Access window updated successfully',
           policy: toResponsePolicy(policy)
         })
+      }
+
+      if (action === 'admin-reset-password') {
+        const { adminUserId, targetUserId, newPassword } = req.body || {}
+
+        if (!adminUserId || !targetUserId || !newPassword) {
+          return res.status(400).json({ success: false, error: 'adminUserId, targetUserId and newPassword are required' })
+        }
+
+        if (newPassword.length < 6) {
+          return res.status(400).json({ success: false, error: 'New password must be at least 6 characters' })
+        }
+
+        const adminUser = await User.findById(adminUserId).select('_id role').lean()
+        if (!adminUser || String(adminUser.role || '').toLowerCase() !== 'admin') {
+          return res.status(403).json({ success: false, error: 'Only admin can change user passwords' })
+        }
+
+        const targetUser = await User.findById(targetUserId).select('_id email role').lean()
+        if (!targetUser) {
+          return res.status(404).json({ success: false, error: 'User not found' })
+        }
+
+        if (String(targetUser.role || '').toLowerCase() === 'admin') {
+          return res.status(403).json({ success: false, error: 'Admin passwords must be changed from account settings' })
+        }
+
+        try {
+          const hashedPassword = await bcrypt.hash(newPassword, 10)
+          const updatedUser = await User.findByIdAndUpdate(
+            targetUserId,
+            { password: hashedPassword },
+            { new: true }
+          ).select('_id email role').lean()
+
+          return res.status(200).json({
+            success: true,
+            message: 'Password updated successfully',
+            user: { id: updatedUser._id, email: updatedUser.email, role: updatedUser.role }
+          })
+        } catch (error) {
+          console.error('Error resetting user password as admin:', error)
+          return res.status(500).json({ success: false, error: 'Failed to reset user password' })
+        }
       }
 
       if (!userId) return res.status(400).json({ success: false, error: 'userId required' })
