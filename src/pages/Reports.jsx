@@ -172,8 +172,8 @@ function Reports() {
       )
       .map(m => ({
         studentName: m.studentDetails?.name || 'Unknown',
-        registerNumber: m.studentDetails?.registerNumber || 'Unknown',
-        branch: m.studentDetails?.branch || 'Unknown',
+        registerNumber: m.studentDetails?.regNumber || 'Unknown',
+        branch: m.studentDetails?.department || 'Unknown',
         year: m.studentDetails?.year || 'Unknown',
         dispatchAttempts: m.dispatchAttempts || 1,
         lastDispatchAttempt: m.updatedAt || new Date()
