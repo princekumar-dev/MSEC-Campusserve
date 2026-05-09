@@ -239,12 +239,6 @@ function AppContent() {
 }
 
 function App() {
-  // Opt-in to React Router v7 future flags
-  const futureFlags = {
-    v7_startTransition: true,
-    v7_relativeSplatPath: true
-  }
-
   // Ensure body scrolling is never permanently blocked
   useEffect(() => {
     const cleanup = ensureBodyScrollable()
@@ -254,7 +248,7 @@ function App() {
   return (
     <ErrorBoundary>
       <AlertProvider>
-        <BrowserRouter future={futureFlags}>
+        <BrowserRouter>
           <AppContent />
         </BrowserRouter>
       </AlertProvider>
