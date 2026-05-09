@@ -422,7 +422,8 @@ export default async function handler(req, res) {
 
     // PATCH endpoints for user updates
     if (req.method === 'PATCH') {
-      const { action, userId } = req.query
+      const action = req.query?.action || req.body?.action
+      const userId = req.query?.userId || req.body?.userId
       if (!action) return res.status(400).json({ success: false, error: 'action required' })
 
       if (action === 'access-policy') {
@@ -460,6 +461,50 @@ export default async function handler(req, res) {
           message: 'Access window updated successfully',
           policy: toResponsePolicy(policy)
         })
+      }
+
+      if (action === 'admin-reset-password') {
+        const { adminUserId, targetUserId, newPassword } = req.body || {}
+
+        if (!adminUserId || !targetUserId || !newPassword) {
+          return res.status(400).json({ success: false, error: 'adminUserId, targetUserId and newPassword are required' })
+        }
+
+        if (newPassword.length < 6) {
+          return res.status(400).json({ success: false, error: 'New password must be at least 6 characters' })
+        }
+
+        const adminUser = await User.findById(adminUserId).select('_id role').lean()
+        if (!adminUser || String(adminUser.role || '').toLowerCase() !== 'admin') {
+          return res.status(403).json({ success: false, error: 'Only admin can change user passwords' })
+        }
+
+        const targetUser = await User.findById(targetUserId).select('_id email role').lean()
+        if (!targetUser) {
+          return res.status(404).json({ success: false, error: 'User not found' })
+        }
+
+        if (String(targetUser.role || '').toLowerCase() === 'admin') {
+          return res.status(403).json({ success: false, error: 'Admin passwords must be changed from account settings' })
+        }
+
+        try {
+          const hashedPassword = await bcrypt.hash(newPassword, 10)
+          const updatedUser = await User.findByIdAndUpdate(
+            targetUserId,
+            { password: hashedPassword },
+            { new: true }
+          ).select('_id email role').lean()
+
+          return res.status(200).json({
+            success: true,
+            message: 'Password updated successfully',
+            user: { id: updatedUser._id, email: updatedUser.email, role: updatedUser.role }
+          })
+        } catch (error) {
+          console.error('Error resetting user password as admin:', error)
+          return res.status(500).json({ success: false, error: 'Failed to reset user password' })
+        }
       }
 
       if (!userId) return res.status(400).json({ success: false, error: 'userId required' })
