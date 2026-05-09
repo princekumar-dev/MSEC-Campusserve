@@ -50,11 +50,14 @@ function DepartmentOverview() {
         ? `/api/marksheets?year=I&includeAll=true`
         : `/api/marksheets?department=${userData.department}&includeAll=true`
 
-      // Fetch marksheets and users in parallel via apiClient
-      const [marksheetsData, usersData] = await Promise.all([
-        apiClient.get(marksheetsUrl),
-        apiClient.get('/api/users')
-      ])
+      // Fetch marksheets data
+      const marksheetsData = await apiClient.get(marksheetsUrl)
+      
+      // Only fetch users list if user is admin (HODs don't have access to list all users)
+      let usersData = { success: false, users: [] }
+      if (userData.role === 'admin') {
+        usersData = await apiClient.get(`/api/users?action=list&userId=${userData.id}`)
+      }
       
       if (marksheetsData.success) {
         let marksheets = marksheetsData.marksheets
