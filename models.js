@@ -57,6 +57,7 @@ const MarksheetSchema = new mongoose.Schema({
   semester: { type: String }, // Add semester field
   subjects: [{
     subjectName: { type: String, required: true },
+    subjectCode: { type: String },
     marks: { type: Number },
     result: { type: String, enum: ['Pass', 'Fail', 'Absent'], required: true }
   }],
@@ -136,6 +137,7 @@ const ImportSessionSchema = new mongoose.Schema({
     examinationDate: Date,
     subjects: [{
       subjectName: String,
+      subjectCode: String,
       marks: Number,
       result: { type: String, enum: ['Pass', 'Fail', 'Absent'] }
     }]
