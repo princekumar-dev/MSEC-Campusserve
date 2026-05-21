@@ -66,6 +66,9 @@ function ImportMarks() {
           setErrors([data?.error || 'Confirm failed'])
         } else {
           setResult(data)
+          // Fire window events to trigger count flips in background pages immediately
+          window.dispatchEvent(new CustomEvent('marksheetsUpdated'))
+          window.dispatchEvent(new CustomEvent('notificationsUpdated'))
         }
       } catch (err) {
         if (err.data && err.data.errorMessages && err.data.errorMessages.length > 0) {

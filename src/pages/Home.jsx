@@ -1,13 +1,84 @@
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import apiClient from '../utils/apiClient'
 import { Link } from 'react-router-dom'
 import ResponsiveImage from '../components/ResponsiveImage'
+import AnimatedCount from '../components/AnimatedCount'
+import { usePushNotifications, usePageFocus } from '../hooks/usePushNotifications'
 
 function Home() {
   const [userData, setUserData] = useState(null)
   const [dashboardStats, setDashboardStats] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  // Stable fetch wrapped in useCallback so hooks can call it
+  const fetchDashboardData = useCallback(async (user, force = false) => {
+    if (!user) return
+    try {
+      setIsLoading(true)
+      let data
+      const opts = force ? { cache: false, dedupe: false } : {}
+      if (user.role === 'staff') {
+        const staffId = user._id || user.id || localStorage.getItem('userId')
+        data = await apiClient.get(`/api/marksheets?staffId=${staffId}`, opts)
+        if (data.success) {
+          const normalizedMarksheets = (data.marksheets || []).map(m => m.status === 'rescheduled_by_hod'
+            ? { ...m, status: 'dispatch_requested', dispatchRequest: { ...(m.dispatchRequest || {}), hodResponse: null } }
+            : m)
+          const verified = normalizedMarksheets.filter(m =>
+            m.status === 'verified_by_staff' ||
+            m.status === 'dispatch_requested' ||
+            m.status === 'approved_by_hod' ||
+            m.status === 'dispatched'
+          ).length
+          const dispatchRequested = normalizedMarksheets.filter(m => m.status === 'dispatch_requested').length
+          const dispatched = normalizedMarksheets.filter(m => m.status === 'dispatched').length
+          const sortedMarksheets = [...normalizedMarksheets].sort((a, b) => {
+            const regA = (a.studentDetails?.regNumber || '').toString().toLowerCase()
+            const regB = (b.studentDetails?.regNumber || '').toString().toLowerCase()
+            return regA.localeCompare(regB, undefined, { numeric: true, sensitivity: 'base' })
+          })
+          setDashboardStats({
+            totalMarksheets: normalizedMarksheets.length,
+            verified,
+            dispatchRequested,
+            dispatched,
+            recentMarksheets: sortedMarksheets.slice(0, 5)
+          })
+        }
+      } else if (user.role === 'hod') {
+        if (user.department === 'HNS') {
+          data = await apiClient.get(`/api/marksheets?year=I`, opts)
+        } else {
+          data = await apiClient.get(`/api/marksheets?hodId=${user.id}`, opts)
+        }
+        if (data.success) {
+          const normalizedMarksheets = (data.marksheets || []).map(m => m.status === 'rescheduled_by_hod'
+            ? { ...m, status: 'dispatch_requested', dispatchRequest: { ...(m.dispatchRequest || {}), hodResponse: null } }
+            : m)
+          const pending = normalizedMarksheets.filter(m => m.status === 'dispatch_requested').length
+          const approved = normalizedMarksheets.filter(m => m.status === 'approved_by_hod').length
+          const dispatched = normalizedMarksheets.filter(m => m.status === 'dispatched').length
+          const sortedMarksheets = [...normalizedMarksheets].sort((a, b) => {
+            const regA = (a.studentDetails?.regNumber || '').toString().toLowerCase()
+            const regB = (b.studentDetails?.regNumber || '').toString().toLowerCase()
+            return regA.localeCompare(regB, undefined, { numeric: true, sensitivity: 'base' })
+          })
+          setDashboardStats({
+            totalMarksheets: normalizedMarksheets.length,
+            pendingApproval: pending,
+            approved,
+            dispatched,
+            recentRequests: sortedMarksheets.filter(m => ['dispatch_requested', 'approved_by_hod', 'dispatched'].includes(m.status)).slice(0, 5)
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     let authData = null
@@ -15,7 +86,6 @@ function Home() {
       const auth = localStorage.getItem('auth')
       if (auth) authData = JSON.parse(auth)
     } catch {
-      // Corrupted auth - clear and rely on App route guard to redirect
       localStorage.removeItem('auth')
       localStorage.removeItem('isLoggedIn')
       localStorage.removeItem('userEmail')
@@ -23,7 +93,6 @@ function Home() {
       localStorage.removeItem('userId')
       return
     }
-    // Fallback to legacy auth keys if present
     if (!authData || typeof authData !== 'object') {
       const loggedIn = localStorage.getItem('isLoggedIn') === 'true'
       const role = localStorage.getItem('userRole')
@@ -35,22 +104,17 @@ function Home() {
         return
       }
     }
-    if (!authData.role || (authData.role !== 'staff' && authData.role !== 'hod')) {
-      return
-    }
-    // If section is missing, fetch latest user data from backend
+    if (!authData.role || (authData.role !== 'staff' && authData.role !== 'hod')) return
+
     if (!authData.section || authData.section === undefined) {
       apiClient.get(`/api/users?action=profile&userId=${authData.id}`)
         .then(data => {
-          if (data?.success && data.user) {
-            const updatedAuth = { ...authData, section: data.user.section, year: data.user.year, department: data.user.department }
-            localStorage.setItem('auth', JSON.stringify(updatedAuth))
-            setUserData(updatedAuth)
-            fetchDashboardData(updatedAuth)
-          } else {
-            setUserData(authData)
-            fetchDashboardData(authData)
-          }
+          const resolved = (data?.success && data.user)
+            ? { ...authData, section: data.user.section, year: data.user.year, department: data.user.department }
+            : authData
+          if (data?.success && data.user) localStorage.setItem('auth', JSON.stringify(resolved))
+          setUserData(resolved)
+          fetchDashboardData(resolved)
         })
         .catch(() => {
           setUserData(authData)
@@ -60,80 +124,46 @@ function Home() {
       setUserData(authData)
       fetchDashboardData(authData)
     }
-  }, [])
 
-  const fetchDashboardData = async (user) => {
-    try {
-      setIsLoading(true)
-      let response, data;
-      if (user.role === 'staff') {
-        const staffId = user._id || user.id || localStorage.getItem('userId');
-        data = await apiClient.get(`/api/marksheets?staffId=${staffId}`);
-        if (data.success) {
-          const normalizedMarksheets = (data.marksheets || []).map(m => m.status === 'rescheduled_by_hod'
-            ? { ...m, status: 'dispatch_requested', dispatchRequest: { ...(m.dispatchRequest || {}), hodResponse: null } }
-            : m)
-          const verified = normalizedMarksheets.filter(m => 
-            m.status === 'verified_by_staff' || 
-            m.status === 'dispatch_requested' || 
-            m.status === 'approved_by_hod' || 
-            m.status === 'dispatched'
-          ).length;
-          const dispatchRequested = normalizedMarksheets.filter(m => m.status === 'dispatch_requested').length;
-          const dispatched = normalizedMarksheets.filter(m => m.status === 'dispatched').length;
-          // Sort marksheets by register number in ascending order
-          const sortedMarksheets = [...normalizedMarksheets].sort((a, b) => {
-            const regA = (a.studentDetails?.regNumber || '').toString().toLowerCase()
-            const regB = (b.studentDetails?.regNumber || '').toString().toLowerCase()
-            return regA.localeCompare(regB, undefined, { numeric: true, sensitivity: 'base' })
-          })
-          
-          const stats = {
-            totalMarksheets: normalizedMarksheets.length,
-            verified,
-            dispatchRequested,
-            dispatched,
-            recentMarksheets: sortedMarksheets.slice(0, 5)
-          };
-          setDashboardStats(stats);
-        }
-      } else if (user.role === 'hod') {
-        // For HNS HOD, show Year I marksheets across all departments so dashboard reflects first-year activity
-        if (user.department === 'HNS') {
-          data = await apiClient.get(`/api/marksheets?year=I`);
-        } else {
-          data = await apiClient.get(`/api/marksheets?hodId=${user.id}`);
-        }
-        if (data.success) {
-          const normalizedMarksheets = (data.marksheets || []).map(m => m.status === 'rescheduled_by_hod'
-            ? { ...m, status: 'dispatch_requested', dispatchRequest: { ...(m.dispatchRequest || {}), hodResponse: null } }
-            : m)
-          const pending = normalizedMarksheets.filter(m => m.status === 'dispatch_requested').length;
-          const approved = normalizedMarksheets.filter(m => m.status === 'approved_by_hod').length;
-          const dispatched = normalizedMarksheets.filter(m => m.status === 'dispatched').length;
-          // Sort marksheets by register number in ascending order
-          const sortedMarksheets = [...normalizedMarksheets].sort((a, b) => {
-            const regA = (a.studentDetails?.regNumber || '').toString().toLowerCase()
-            const regB = (b.studentDetails?.regNumber || '').toString().toLowerCase()
-            return regA.localeCompare(regB, undefined, { numeric: true, sensitivity: 'base' })
-          })
-          
-          const stats = {
-            totalMarksheets: normalizedMarksheets.length,
-            pendingApproval: pending,
-            approved,
-            dispatched,
-            recentRequests: sortedMarksheets.filter(m => ['dispatch_requested', 'approved_by_hod', 'dispatched'].includes(m.status)).slice(0, 5)
-          };
-          setDashboardStats(stats);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-    } finally {
-      setIsLoading(false);
+    // Listen for global marksheet updates (e.g. from import flow)
+    const onUpdate = () => {
+      const latest = (() => { try { return JSON.parse(localStorage.getItem('auth')) } catch { return null } })()
+      fetchDashboardData(latest || authData, true)
     }
-  }
+    window.addEventListener('marksheetsUpdated', onUpdate)
+    window.addEventListener('notificationsUpdated', onUpdate)
+    return () => {
+      window.removeEventListener('marksheetsUpdated', onUpdate)
+      window.removeEventListener('notificationsUpdated', onUpdate)
+    }
+  }, [fetchDashboardData])
+
+  // Real-time push notifications
+  usePushNotifications({
+    'marksheet_approval': () => {
+      const u = (() => { try { return JSON.parse(localStorage.getItem('auth')) } catch { return null } })()
+      fetchDashboardData(u || userData, true)
+    },
+    'dispatch_request': () => {
+      const u = (() => { try { return JSON.parse(localStorage.getItem('auth')) } catch { return null } })()
+      fetchDashboardData(u || userData, true)
+    },
+    'marksheet_dispatch': () => {
+      const u = (() => { try { return JSON.parse(localStorage.getItem('auth')) } catch { return null } })()
+      fetchDashboardData(u || userData, true)
+    },
+    'marksheet_update': () => {
+      const u = (() => { try { return JSON.parse(localStorage.getItem('auth')) } catch { return null } })()
+      fetchDashboardData(u || userData, true)
+    }
+  })
+
+  // Refresh on tab focus
+  usePageFocus(() => {
+    const u = (() => { try { return JSON.parse(localStorage.getItem('auth')) } catch { return null } })()
+    fetchDashboardData(u || userData, true)
+  }, 30000)
+
 
   if (isLoading) {
     return (
@@ -218,7 +248,7 @@ function Home() {
                     </div>
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-600">Total Marksheets</p>
-                      <p className="text-2xl font-bold text-gray-900">{dashboardStats?.totalMarksheets || 0}</p>
+                      <p className="text-2xl font-bold text-gray-900"><AnimatedCount value={dashboardStats?.totalMarksheets || 0} /></p>
                     </div>
                   </div>
                 </div>
@@ -232,7 +262,7 @@ function Home() {
                     </div>
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-600">Verified</p>
-                      <p className="text-2xl font-bold text-gray-900">{dashboardStats?.verified || 0}</p>
+                      <p className="text-2xl font-bold text-gray-900"><AnimatedCount value={dashboardStats?.verified || 0} /></p>
                     </div>
                   </div>
                 </div>
@@ -246,7 +276,7 @@ function Home() {
                     </div>
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-600">Dispatch Requested</p>
-                      <p className="text-2xl font-bold text-gray-900">{dashboardStats?.dispatchRequested || 0}</p>
+                      <p className="text-2xl font-bold text-gray-900"><AnimatedCount value={dashboardStats?.dispatchRequested || 0} /></p>
                     </div>
                   </div>
                 </div>
@@ -260,7 +290,7 @@ function Home() {
                     </div>
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-600">Dispatched</p>
-                      <p className="text-2xl font-bold text-gray-900">{dashboardStats?.dispatched || 0}</p>
+                      <p className="text-2xl font-bold text-gray-900"><AnimatedCount value={dashboardStats?.dispatched || 0} /></p>
                     </div>
                   </div>
                 </div>
@@ -321,7 +351,7 @@ function Home() {
                     </div>
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-600">Total Marksheets</p>
-                      <p className="text-2xl font-bold text-gray-900">{dashboardStats?.totalMarksheets || 0}</p>
+                      <p className="text-2xl font-bold text-gray-900"><AnimatedCount value={dashboardStats?.totalMarksheets || 0} /></p>
                     </div>
                   </div>
                 </div>
@@ -335,7 +365,7 @@ function Home() {
                     </div>
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-600">Pending Approval</p>
-                      <p className="text-2xl font-bold text-gray-900">{dashboardStats?.pendingApproval || 0}</p>
+                      <p className="text-2xl font-bold text-gray-900"><AnimatedCount value={dashboardStats?.pendingApproval || 0} /></p>
                     </div>
                   </div>
                 </div>
@@ -349,7 +379,7 @@ function Home() {
                     </div>
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-600">Approved</p>
-                      <p className="text-2xl font-bold text-gray-900">{dashboardStats?.approved || 0}</p>
+                      <p className="text-2xl font-bold text-gray-900"><AnimatedCount value={dashboardStats?.approved || 0} /></p>
                     </div>
                   </div>
                 </div>
@@ -363,7 +393,7 @@ function Home() {
                     </div>
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-600">Dispatched</p>
-                      <p className="text-2xl font-bold text-gray-900">{dashboardStats?.dispatched || 0}</p>
+                      <p className="text-2xl font-bold text-gray-900"><AnimatedCount value={dashboardStats?.dispatched || 0} /></p>
                     </div>
                   </div>
                 </div>

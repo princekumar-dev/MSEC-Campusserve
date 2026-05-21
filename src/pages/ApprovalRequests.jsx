@@ -11,6 +11,7 @@ import { useConfetti } from '../components/Confetti'
 import { HelpTooltip } from '../components/ContextualHelp'
 import usePullToRefresh, { PullToRefreshIndicator } from '../hooks/usePullToRefresh.jsx'
 import { usePushNotifications, usePageFocus } from '../hooks/usePushNotifications'
+import AnimatedCount from '../components/AnimatedCount'
 
 const departmentDisplay = {
   'AI_DS': 'AI & DS',
@@ -493,7 +494,7 @@ function ApprovalRequests() {
                     >
                       {filter.label}
                       <span className={`ml-2 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-semibold ${selectedStatus === filter.id ? 'bg-white/25 text-white' : 'bg-gray-100 text-gray-700'}`}>
-                        {filter.count}
+                        <AnimatedCount value={filter.count} />
                       </span>
                     </button>
                   ))}
@@ -521,7 +522,7 @@ function ApprovalRequests() {
                           <HelpTooltip content="Quickly approve or reject all pending dispatch requests at once." />
                         </div>
                         <p className="text-xs text-gray-600">
-                          {filteredRequests.filter(m => m.status === 'dispatch_requested').length} pending requests available
+                          <AnimatedCount value={filteredRequests.filter(m => m.status === 'dispatch_requested').length} /> pending requests available
                         </p>
                       </div>
                     </div>

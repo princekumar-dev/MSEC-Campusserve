@@ -12,6 +12,7 @@ import { useConfetti } from '../components/Confetti'
 import { HelpTooltip } from '../components/ContextualHelp'
 import { deriveOverallResult } from '../utils/resultUtils'
 import usePullToRefresh, { PullToRefreshIndicator } from '../hooks/usePullToRefresh.jsx'
+import { usePushNotifications, usePageFocus } from '../hooks/usePushNotifications'
 import { FixedSizeList as List } from 'react-window'
 import AnimatedCount from '../components/AnimatedCount'
 import { formatSubjectLabel, getDefaultSubjects } from '../../shared/subjectCatalog'
@@ -260,6 +261,25 @@ function Marksheets() {
       console.error('Error fetching examinations:', error)
     }
   }
+
+  const refreshFromNotifications = useCallback(() => {
+    if (!userData || userData.role !== 'staff') return
+    fetchMarksheets(true, 1)
+    fetchExaminations(true)
+  }, [userData, fetchMarksheets, fetchExaminations])
+
+  usePushNotifications({
+    dispatch_request: refreshFromNotifications,
+    marksheet_approval: refreshFromNotifications,
+    marksheet_dispatch: refreshFromNotifications
+  })
+
+  usePageFocus(() => {
+    if (userData && userData.role === 'staff') {
+      fetchMarksheets(true, currentPage)
+      fetchExaminations(true)
+    }
+  })
 
   const updateLoadedMarksheets = useCallback((ids, updater) => {
     if (!Array.isArray(ids) || ids.length === 0) return
