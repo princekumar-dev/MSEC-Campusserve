@@ -22,11 +22,12 @@ export function usePushNotifications(handlers = {}) {
       if (!event.data) return
       
       const { type, data } = event.data
-      
-      if (type === 'NOTIFICATION_RECEIVED' && handlers[data?.notificationType]) {
-        console.log(`📲 Push notification received: ${data.notificationType}`)
+      const notificationType = data?.notificationType || data?.type || data?.data?.type
+
+      if (type === 'NOTIFICATION_RECEIVED' && notificationType && handlers[notificationType]) {
+        console.log(`📲 Push notification received: ${notificationType}`)
         console.log('   Triggering refresh handler...')
-        handlers[data.notificationType](data)
+        handlers[notificationType](data)
       }
     }
 

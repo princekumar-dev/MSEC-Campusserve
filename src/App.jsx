@@ -25,7 +25,7 @@ import apiClient from './utils/apiClient'
 import { ensureBodyScrollable } from './utils/scrollFix'
 import { getAuthOrNull } from './utils/auth'
 import { getAccessBlockMeta, refreshAccessPolicy } from './utils/accessPolicy'
-// Removed old notification imports for academic system
+import GlobalExecutionLoader from './components/GlobalExecutionLoader'
 
 const clearStoredAuth = () => {
   try {
@@ -137,11 +137,12 @@ const ProtectedStaffOrHod = ({ children }) => {
 
 // Redirect to dashboard if already authenticated (for Login/SignUp)
 const RedirectIfAuthenticated = ({ children, allowAdmin = false }) => {
-  void allowAdmin
   const parsed = getAuthOrNull()
   if (!parsed) return children
   const blocked = getAccessBlockMeta(parsed.role)
   if (blocked) return children
+  // Allow admin to access signup page for creating new users
+  if (allowAdmin && parsed.role === 'admin') return children
   return <Navigate to={getDashboardPathForRole(parsed.role)} replace />
 }
 
@@ -181,6 +182,7 @@ function AppContent() {
 
   return (
     <>
+      <GlobalExecutionLoader />
       <div
         className={`flex w-full flex-col ${isAuthPage ? 'relative' : ''}`}
         style={{
@@ -238,12 +240,6 @@ function AppContent() {
 }
 
 function App() {
-  // Opt-in to React Router v7 future flags
-  const futureFlags = {
-    v7_startTransition: true,
-    v7_relativeSplatPath: true
-  }
-
   // Ensure body scrolling is never permanently blocked
   useEffect(() => {
     const cleanup = ensureBodyScrollable()
@@ -253,7 +249,7 @@ function App() {
   return (
     <ErrorBoundary>
       <AlertProvider>
-        <BrowserRouter future={futureFlags}>
+        <BrowserRouter>
           <AppContent />
         </BrowserRouter>
       </AlertProvider>

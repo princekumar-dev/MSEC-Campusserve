@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiClient from '../utils/apiClient'
+import AnimatedCount from '../components/AnimatedCount'
+import { usePushNotifications, usePageFocus } from '../hooks/usePushNotifications'
 
 function DepartmentOverview() {
   const navigate = useNavigate()
@@ -37,24 +39,21 @@ function DepartmentOverview() {
     'HNS': { cardBg: 'bg-gradient-to-br from-yellow-50 to-yellow-100', border: 'border-yellow-200', title: 'text-yellow-700', value: 'text-yellow-800', accent: 'text-yellow-600' }
   }
 
-  useEffect(() => {
-    if (userData && userData.role === 'hod') {
-      fetchDepartmentData()
-    }
-  }, [userData])
-
-  const fetchDepartmentData = async () => {
+  const fetchDepartmentData = useCallback(async () => {
     try {
       // For HNS HOD, fetch Year I marksheets across all departments
       const marksheetsUrl = userData.department === 'HNS'
         ? `/api/marksheets?year=I&includeAll=true`
         : `/api/marksheets?department=${userData.department}&includeAll=true`
 
-      // Fetch marksheets and users in parallel via apiClient
-      const [marksheetsData, usersData] = await Promise.all([
-        apiClient.get(marksheetsUrl),
-        apiClient.get('/api/users')
-      ])
+      // Fetch marksheets data
+      const marksheetsData = await apiClient.get(marksheetsUrl)
+      
+      // Only fetch users list if user is admin (HODs don't have access to list all users)
+      let usersData = { success: false, users: [] }
+      if (userData.role === 'admin') {
+        usersData = await apiClient.get(`/api/users?action=list&userId=${userData.id}`)
+      }
       
       if (marksheetsData.success) {
         let marksheets = marksheetsData.marksheets
@@ -314,7 +313,39 @@ function DepartmentOverview() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [userData])
+
+  useEffect(() => {
+    if (userData && userData.role === 'hod') {
+      fetchDepartmentData()
+    }
+  }, [userData, fetchDepartmentData])
+
+  usePushNotifications({
+    dispatch_request: () => fetchDepartmentData(),
+    marksheet_approval: () => fetchDepartmentData(),
+    marksheet_dispatch: () => fetchDepartmentData()
+  })
+
+  usePageFocus(() => {
+    if (userData && userData.role === 'hod') {
+      fetchDepartmentData()
+    }
+  })
+
+  useEffect(() => {
+    const handler = () => {
+      if (userData && userData.role === 'hod') {
+        fetchDepartmentData()
+      }
+    }
+    window.addEventListener('marksheetsUpdated', handler)
+    window.addEventListener('notificationsUpdated', handler)
+    return () => {
+      window.removeEventListener('marksheetsUpdated', handler)
+      window.removeEventListener('notificationsUpdated', handler)
+    }
+  }, [userData, fetchDepartmentData])
 
   if (!userData || userData.role !== 'hod') {
     return (
@@ -346,15 +377,21 @@ function DepartmentOverview() {
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="glass-card px-3 py-2 rounded-xl">
                     <div className="text-xs text-gray-500">Students</div>
-                    <div className="text-xl md:text-2xl font-bold text-theme-gold-600">{departmentStats?.totalStudents || 0}</div>
+                    <div className="text-xl md:text-2xl font-bold text-theme-gold-600">
+                      <AnimatedCount value={departmentStats?.totalStudents || 0} />
+                    </div>
                   </div>
                   <div className="glass-card px-3 py-2 rounded-xl">
                     <div className="text-xs text-gray-500">Completion</div>
-                    <div className="text-xl md:text-2xl font-bold text-green-600">{departmentStats?.completionRate || 0}%</div>
+                    <div className="text-xl md:text-2xl font-bold text-green-600">
+                      <AnimatedCount value={departmentStats?.completionRate || 0} />%
+                    </div>
                   </div>
                   <div className="glass-card px-3 py-2 rounded-xl">
                     <div className="text-xs text-gray-500">Pending</div>
-                    <div className="text-xl md:text-2xl font-bold text-yellow-600">{departmentStats?.pendingActions || 0}</div>
+                    <div className="text-xl md:text-2xl font-bold text-yellow-600">
+                      <AnimatedCount value={departmentStats?.pendingActions || 0} />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -386,7 +423,9 @@ function DepartmentOverview() {
                           <div className="flex items-center justify-between">
                             <div>
                               <p className={`text-xs md:text-sm font-medium mb-1 ${style.title}`}>{d.department}</p>
-                              <p className={`text-2xl md:text-3xl font-bold ${style.value}`}>{d.totalMarksheets ?? d.count ?? d.total ?? 0}</p>
+                              <p className={`text-2xl md:text-3xl font-bold ${style.value}`}>
+                                <AnimatedCount value={d.totalMarksheets ?? d.count ?? d.total ?? 0} />
+                              </p>
                             </div>
                             <div>
                               <span className={`inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full ${departmentColors[d.department] || 'bg-gray-100 text-gray-800'}`}>
@@ -437,15 +476,15 @@ function DepartmentOverview() {
                         </div>
                         <div className="grid grid-cols-3 gap-2 text-center">
                           <div>
-                            <div className="text-lg font-bold text-indigo-900">{staff.total}</div>
+                            <div className="text-lg font-bold text-indigo-900"><AnimatedCount value={staff.total} /></div>
                             <div className="text-xs text-indigo-600">Total</div>
                           </div>
                           <div>
-                            <div className="text-lg font-bold text-green-600">{staff.verified}</div>
+                            <div className="text-lg font-bold text-green-600"><AnimatedCount value={staff.verified} /></div>
                             <div className="text-xs text-indigo-600">Verified</div>
                           </div>
                           <div>
-                            <div className="text-lg font-bold text-purple-600">{staff.dispatched}</div>
+                            <div className="text-lg font-bold text-purple-600"><AnimatedCount value={staff.dispatched} /></div>
                             <div className="text-xs text-indigo-600">Sent</div>
                           </div>
                         </div>
@@ -470,7 +509,9 @@ function DepartmentOverview() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                         </div>
-                        <span className="text-xs font-semibold text-yellow-600 bg-yellow-50 px-2 py-1 rounded-full">{departmentStats?.byStatus.pending || 0}</span>
+                        <span className="text-xs font-semibold text-yellow-600 bg-yellow-50 px-2 py-1 rounded-full">
+                          <AnimatedCount value={departmentStats?.byStatus.pending || 0} />
+                        </span>
                       </div>
                       <h3 className="text-base md:text-lg font-bold text-yellow-900 mb-2">Pending Approvals</h3>
                       <p className="text-sm text-yellow-700">Review dispatch requests awaiting approval</p>

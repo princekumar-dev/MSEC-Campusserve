@@ -52,7 +52,20 @@ async function request(method, url, opts = {}) {
     cache.delete(key);
   }
 
+  // Track active API requests globally
+  let activeCount = Number(window.__activeApiRequests || 0) + 1;
+  window.__activeApiRequests = activeCount;
+  try {
+    window.dispatchEvent(new CustomEvent('apiProgress', { detail: { count: activeCount } }));
+  } catch (e) {}
+
   if (dedupe && inFlight.has(key)) {
+    // Make sure we decrement if we return a deduped request early because that promise will also hit the finally
+    activeCount = Math.max(0, Number(window.__activeApiRequests || 0) - 1);
+    window.__activeApiRequests = activeCount;
+    try {
+      window.dispatchEvent(new CustomEvent('apiProgress', { detail: { count: activeCount } }));
+    } catch (e) {}
     return inFlight.get(key);
   }
 
@@ -189,6 +202,11 @@ async function request(method, url, opts = {}) {
   // duplicate requests to start while retries were still ongoing.
   p.finally(() => {
     try { inFlight.delete(key); } catch (e) { /* ignore */ }
+    const updatedCount = Math.max(0, Number(window.__activeApiRequests || 0) - 1);
+    window.__activeApiRequests = updatedCount;
+    try {
+      window.dispatchEvent(new CustomEvent('apiProgress', { detail: { count: updatedCount } }));
+    } catch (e) {}
   });
 
   return p;

@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import apiClient from '../utils/apiClient'
 import { getUserFriendlyMessage } from '../utils/apiErrorMessages'
 import { HelpTooltip } from '../components/ContextualHelp'
 import { deriveOverallResult, deriveSubjectResult } from '../utils/resultUtils'
+import AnimatedCount from '../components/AnimatedCount'
+import { usePushNotifications, usePageFocus } from '../hooks/usePushNotifications'
 
 function Reports() {
   const [userData, setUserData] = useState(() => {
@@ -14,45 +16,30 @@ function Reports() {
   const [reportData, setReportData] = useState(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const reportRef = useRef(null)
 
-  useEffect(() => {
-    if (userData?.role === 'hod') {
-      fetchDepartmentMarksheets()
-    }
-  }, [userData])
-
-  const fetchDepartmentMarksheets = async () => {
+  const fetchDepartmentMarksheets = useCallback(async () => {
     try {
       setLoading(true)
       let apiUrl
-      
-      // If HNS HOD, fetch Year I marksheets across all departments
       if (userData.role === 'hod' && userData.department === 'HNS') {
         apiUrl = '/api/marksheets?year=I&includeAll=true'
       } else {
-        // For other HODs, fetch only their department
         apiUrl = `/api/marksheets?department=${userData.department}&includeAll=true`
       }
-      
-      const data = await apiClient.get(apiUrl)
+      const data = await apiClient.get(apiUrl, { cache: false, dedupe: false })
       if (data.success) {
-        // Sort marksheets by register number in ascending order
         let sortedMarksheets = data.marksheets.sort((a, b) => {
           const regA = (a.studentDetails?.regNumber || '').toString().toLowerCase()
           const regB = (b.studentDetails?.regNumber || '').toString().toLowerCase()
           return regA.localeCompare(regB, undefined, { numeric: true, sensitivity: 'base' })
         })
-        
-        // Filter based on year access:
-        // - HNS HOD: Already filtered by year=I in API call
-        // - Other HODs: Exclude Year I (only show years 2-4)
         if (userData.role === 'hod' && userData.department !== 'HNS') {
           sortedMarksheets = sortedMarksheets.filter(m => {
             const year = m.studentDetails?.year || 'Unknown'
             return year !== 'I'
           })
         }
-        
         setMarksheets(sortedMarksheets)
       }
     } catch (err) {
@@ -61,7 +48,49 @@ function Reports() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [userData])
+
+  useEffect(() => {
+    if (userData?.role === 'hod') {
+      fetchDepartmentMarksheets()
+    }
+  }, [userData, fetchDepartmentMarksheets])
+
+  // Real-time updates: listen for global marksheet events
+  useEffect(() => {
+    const onUpdate = () => {
+      if (userData?.role === 'hod') fetchDepartmentMarksheets()
+    }
+    window.addEventListener('marksheetsUpdated', onUpdate)
+    window.addEventListener('notificationsUpdated', onUpdate)
+    return () => {
+      window.removeEventListener('marksheetsUpdated', onUpdate)
+      window.removeEventListener('notificationsUpdated', onUpdate)
+    }
+  }, [userData, fetchDepartmentMarksheets])
+
+  // Push notification hooks
+  usePushNotifications({
+    'marksheet_approval': () => { if (userData?.role === 'hod') fetchDepartmentMarksheets() },
+    'dispatch_request':   () => { if (userData?.role === 'hod') fetchDepartmentMarksheets() },
+    'marksheet_dispatch': () => { if (userData?.role === 'hod') fetchDepartmentMarksheets() },
+    'marksheet_update':   () => { if (userData?.role === 'hod') fetchDepartmentMarksheets() }
+  })
+
+  // Refresh on tab focus
+  usePageFocus(() => {
+    if (userData?.role === 'hod') fetchDepartmentMarksheets()
+  }, 30000)
+
+  useEffect(() => {
+    if (reportData && reportRef.current) {
+      // Small timeout to ensure DOM is fully painted, especially on mobile devices
+      setTimeout(() => {
+        reportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 100)
+    }
+  }, [reportData])
+
 
   const generateDepartmentSummary = () => {
     const statsCollection = {}
@@ -172,8 +201,8 @@ function Reports() {
       )
       .map(m => ({
         studentName: m.studentDetails?.name || 'Unknown',
-        registerNumber: m.studentDetails?.registerNumber || 'Unknown',
-        branch: m.studentDetails?.branch || 'Unknown',
+        registerNumber: m.studentDetails?.regNumber || 'Unknown',
+        branch: m.studentDetails?.department || 'Unknown',
         year: m.studentDetails?.year || 'Unknown',
         dispatchAttempts: m.dispatchAttempts || 1,
         lastDispatchAttempt: m.updatedAt || new Date()
@@ -359,7 +388,7 @@ function Reports() {
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="glass-card px-3 py-2 rounded-xl">
                     <div className="text-xs text-gray-500">Total Records</div>
-                    <div className="text-xl md:text-2xl font-bold text-theme-gold-600">{marksheets.length}</div>
+                    <div className="text-xl md:text-2xl font-bold text-theme-gold-600"><AnimatedCount value={marksheets.length} /></div>
                   </div>
                 </div>
               </div>
@@ -407,7 +436,7 @@ function Reports() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs md:text-sm text-blue-600 font-medium mb-1">Total</p>
-                      <p className="text-2xl md:text-3xl font-bold text-blue-700">{marksheets.length}</p>
+                      <p className="text-2xl md:text-3xl font-bold text-blue-700"><AnimatedCount value={marksheets.length} /></p>
                     </div>
                     <svg className="w-8 h-8 md:w-10 md:h-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -418,7 +447,7 @@ function Reports() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs md:text-sm text-green-600 font-medium mb-1">Dispatched</p>
-                      <p className="text-2xl md:text-3xl font-bold text-green-700">{marksheets.filter(m => m.status === 'dispatched').length}</p>
+                      <p className="text-2xl md:text-3xl font-bold text-green-700"><AnimatedCount value={marksheets.filter(m => m.status === 'dispatched').length} /></p>
                     </div>
                     <svg className="w-8 h-8 md:w-10 md:h-10 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -429,7 +458,7 @@ function Reports() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs md:text-sm text-yellow-600 font-medium mb-1">Pending</p>
-                      <p className="text-2xl md:text-3xl font-bold text-yellow-700">{marksheets.filter(m => ['approved_by_hod', 'dispatch_requested'].includes(m.status)).length}</p>
+                      <p className="text-2xl md:text-3xl font-bold text-yellow-700"><AnimatedCount value={marksheets.filter(m => ['approved_by_hod', 'dispatch_requested'].includes(m.status)).length} /></p>
                     </div>
                     <svg className="w-8 h-8 md:w-10 md:h-10 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -440,7 +469,7 @@ function Reports() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs md:text-sm text-red-600 font-medium mb-1">Rejected</p>
-                      <p className="text-2xl md:text-3xl font-bold text-red-700">{marksheets.filter(m => m.status === 'rejected_by_hod').length}</p>
+                      <p className="text-2xl md:text-3xl font-bold text-red-700"><AnimatedCount value={marksheets.filter(m => m.status === 'rejected_by_hod').length} /></p>
                     </div>
                     <svg className="w-8 h-8 md:w-10 md:h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -616,7 +645,7 @@ function Reports() {
 
             {/* Report Display */}
             {reportData && (
-              <div className="mt-6 md:mt-8 responsive-card bg-white border-2 border-gray-200">
+              <div ref={reportRef} className="mt-6 md:mt-8 responsive-card bg-white border-2 border-gray-200">
                 <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
                   <div>
                     <h3 className="responsive-heading-2 text-gray-900 mb-1">

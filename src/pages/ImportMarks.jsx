@@ -41,7 +41,13 @@ function ImportMarks() {
           setErrors(data.errorMessages || [])
         }
       } catch (err) {
-        setErrors([getUserFriendlyMessage(err, 'Unexpected error')])
+        if (err.data && err.data.errorMessages && err.data.errorMessages.length > 0) {
+          setErrors(err.data.errorMessages)
+        } else if (err.data && err.data.error) {
+          setErrors([err.data.error])
+        } else {
+          setErrors([getUserFriendlyMessage(err, 'Unexpected error')])
+        }
       }
     } catch (e) {
       setErrors([getUserFriendlyMessage(e, 'Unexpected error')])
@@ -60,9 +66,18 @@ function ImportMarks() {
           setErrors([data?.error || 'Confirm failed'])
         } else {
           setResult(data)
+          // Fire window events to trigger count flips in background pages immediately
+          window.dispatchEvent(new CustomEvent('marksheetsUpdated'))
+          window.dispatchEvent(new CustomEvent('notificationsUpdated'))
         }
       } catch (err) {
-        setErrors([getUserFriendlyMessage(err, 'Unexpected error')])
+        if (err.data && err.data.errorMessages && err.data.errorMessages.length > 0) {
+          setErrors(err.data.errorMessages)
+        } else if (err.data && err.data.error) {
+          setErrors([err.data.error])
+        } else {
+          setErrors([getUserFriendlyMessage(err, 'Unexpected error')])
+        }
       }
     } catch (e) {
       setErrors([getUserFriendlyMessage(e, 'Unexpected error')])

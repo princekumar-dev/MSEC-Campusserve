@@ -2,6 +2,7 @@ import { connectToDatabase } from '../lib/mongo.js'
 import { ImportSession, Student, Marksheet, User } from '../models.js'
 import multer from 'multer'
 import XLSX from 'xlsx'
+import { normalizeSubject } from '../shared/subjectCatalog.js'
 
 // Configure multer for file uploads
 const upload = multer({ 
@@ -155,27 +156,55 @@ export default async function handler(req, res) {
             for (let i = 0; i < jsonData.length; i++) {
               const row = jsonData[i]
               const rowNum = i + 2 // Excel row number (1-indexed + header)
-              const attendanceRaw = row.Attendance ?? row['Attendance %'] ?? row['Attendance%'] ?? row.attendance
-              const parentPhoneRaw = row.ParentPhone ?? row.ParentPhoneNumber ?? row.parentPhone
+
+              // Helper for flexible column matching (ignores spaces and case)
+              const getValAndKey = (possibleKeys) => {
+                const matchedKey = Object.keys(row).find(k => possibleKeys.includes(k.replace(/\\s+/g, '').toLowerCase()))
+                return { val: matchedKey ? row[matchedKey] : undefined, key: matchedKey }
+              }
+
+              const nameRes = getValAndKey(['name', 'studentname', 'student'])
+              const regNumberRes = getValAndKey(['regnumber', 'register', 'regno', 'rollno', 'registerbumber', 'registernumber'])
+              const sectionRes = getValAndKey(['section', 'sec', 'class'])
+              const attendanceRes = getValAndKey(['attendance', 'attendance%'])
+              const parentPhoneRes = getValAndKey(['parentphone', 'parentphonenumber', 'phone', 'phonenumber', 'mobile', 'mobilenumber'])
+              const examNameRes = getValAndKey(['examinationname', 'examname', 'exam'])
+              const examDateRes = getValAndKey(['examinationdate', 'examdate', 'date'])
+
+              const nameRaw = nameRes.val
+              const regNumberRaw = regNumberRes.val
+              const sectionRaw = sectionRes.val
+              const attendanceRaw = attendanceRes.val
+              const parentPhoneRaw = parentPhoneRes.val
 
               // Required fields validation
-              if (!row.Name || !row.RegNumber || !row.Section || !parentPhoneRaw || attendanceRaw === undefined || attendanceRaw === null || attendanceRaw === '') {
+              if (!nameRaw || !regNumberRaw || !sectionRaw || !parentPhoneRaw || attendanceRaw === undefined || attendanceRaw === null || attendanceRaw === '') {
                 errorMessages.push(`Row ${rowNum}: Missing required fields (Name, RegNumber, Section, ParentPhone, Attendance)`)
                 continue
               }
 
               // Extract subject marks (all columns that aren't basic student info)
+              const knownColumns = [
+                'name', 'studentname', 'student',
+                'regnumber', 'register', 'regno', 'rollno', 'registerbumber', 'registernumber',
+                'year', 'section', 'sec', 'class',
+                'parentphone', 'parentphonenumber', 'phone', 'phonenumber', 'mobile', 'mobilenumber',
+                'attendance', 'attendance%',
+                'examinationname', 'examname', 'exam',
+                'examinationdate', 'examdate', 'date'
+              ]
               const subjects = []
-              const subjectFields = Object.keys(row).filter(key => 
-                !['Name', 'RegNumber', 'Year', 'Section', 'ParentPhone', 'ParentPhoneNumber', 'parentPhone', 'Attendance', 'Attendance %', 'Attendance%', 'attendance', 'ExaminationName', 'ExaminationDate'].includes(key) &&
-                !isAttendanceColumn(key)
-              )
+              const subjectFields = Object.keys(row).filter(key => {
+                const normalizedKey = key.replace(/\\s+/g, '').toLowerCase()
+                return !knownColumns.includes(normalizedKey) && !normalizedKey.startsWith('attendance')
+              })
 
               for (const subjectName of subjectFields) {
                 const rawValue = row[subjectName]
+                const normalizedSubject = normalizeSubject(subjectName, resolvedDepartment, yearParam, semester)
                 if (isAbsentValue(rawValue)) {
                   subjects.push({
-                    subjectName,
+                    ...normalizedSubject,
                     marks: null,
                     result: 'Absent'
                   })
@@ -188,7 +217,7 @@ export default async function handler(req, res) {
                   continue
                 }
                 subjects.push({
-                  subjectName,
+                  ...normalizedSubject,
                   marks,
                   result: getResultFromMarks(marks)
                 })
@@ -200,15 +229,23 @@ export default async function handler(req, res) {
               }
 
               studentsData.push({
-                name: row.Name.toString().trim(),
-                regNumber: row.RegNumber.toString().trim(),
+                name: nameRaw.toString().trim(),
+                regNumber: regNumberRaw.toString().trim(),
                 year: yearParam,
-                section: row.Section.toString().trim(),
+                section: sectionRaw.toString().trim(),
                 parentPhoneNumber: normalizePhone(parentPhoneRaw),
                 attendance: normalizeAttendance(attendanceRaw),
-                examinationName: row.ExaminationName ? row.ExaminationName.toString().trim() : derivedExamName,
-                examinationDate: row.ExaminationDate ? new Date(row.ExaminationDate) : derivedExamDate,
+                examinationName: examNameRes.val ? examNameRes.val.toString().trim() : derivedExamName,
+                examinationDate: examDateRes.val ? new Date(examDateRes.val) : derivedExamDate,
                 subjects
+              })
+            }
+
+            if (errorMessages.length > 0) {
+              return res.status(400).json({ 
+                success: false, 
+                error: 'Excel file contains formatting or validation errors.',
+                errorMessages 
               })
             }
 
@@ -229,8 +266,8 @@ export default async function handler(req, res) {
               examinationName: derivedExamName,
               examinationDate: derivedExamDate,
               studentsData,
-              status: errorMessages.length === 0 ? 'pending' : 'error',
-              errorMessages
+              status: 'pending',
+              errorMessages: []
             })
 
             await importSession.save()
@@ -239,8 +276,8 @@ export default async function handler(req, res) {
               success: true, 
               sessionId: importSession.sessionId,
               studentsCount: studentsData.length,
-              errorMessages,
-              hasErrors: errorMessages.length > 0
+              errorMessages: [],
+              hasErrors: false
             })
 
           } catch (parseErr) {
