@@ -560,6 +560,83 @@ export const normalizeSubjectKey = (value = '') => (
     .replace(/[^a-z0-9]+/g, '')
 )
 
+// Clean subject name for smarter comparison
+export const cleanSubjectName = (name = '') => (
+  name
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(CODE_PATTERN, '')
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9\s]+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+)
+
+// Edit distance (Levenshtein) algorithm
+const getEditDistance = (a, b) => {
+  if (a.length === 0) return b.length
+  if (b.length === 0) return a.length
+  const matrix = []
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i]
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j
+  }
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1]
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          Math.min(
+            matrix[i][j - 1] + 1, // insertion
+            matrix[i - 1][j] + 1 // deletion
+          )
+        )
+      }
+    }
+  }
+  return matrix[b.length][a.length]
+}
+
+// Token-based matching: returns true if all words of one cleaned name are in another
+const hasTokenInclusion = (clean1, clean2) => {
+  const words1 = clean1.split(' ').filter(w => w.length > 2)
+  const words2 = clean2.split(' ').filter(w => w.length > 2)
+  if (words1.length === 0 || words2.length === 0) return false
+  const all1In2 = words1.every(w => clean2.includes(w))
+  const all2In1 = words2.every(w => clean1.includes(w))
+  return all1In2 || all2In1
+}
+
+// Super-smart matching logic
+export const isSubjectMatch = (inputName = '', defaultName = '') => {
+  const cleanInput = cleanSubjectName(inputName)
+  const cleanDefault = cleanSubjectName(defaultName)
+
+  if (!cleanInput || !cleanDefault) return false
+  if (cleanInput === cleanDefault) return true
+
+  // Substring or prefix match
+  if (cleanInput.includes(cleanDefault) || cleanDefault.includes(cleanInput)) return true
+
+  // Token-based matching (handles order/extra words like 'lab' or 'and Mechanics')
+  if (hasTokenInclusion(cleanInput, cleanDefault)) return true
+
+  // Fuzzy match using Levenshtein distance
+  const maxLen = Math.max(cleanInput.length, cleanDefault.length)
+  if (maxLen > 0) {
+    const dist = getEditDistance(cleanInput, cleanDefault)
+    const similarity = 1 - dist / maxLen
+    if (similarity > 0.8) return true
+  }
+
+  return false
+}
+
 export const formatSubjectLabel = ({ code, name } = {}) => {
   const cleanCode = code ? code.toString().trim().toUpperCase() : ''
   const cleanName = name ? name.toString().trim() : ''
@@ -606,14 +683,15 @@ export const normalizeSubject = (subjectName, department, year, semester) => {
   const defaults = getDefaultSubjects(department, year, semester)
   const matchedDefault = defaults.find((subject) => {
     if (parsed.code && subject.code?.toUpperCase() === parsed.code) return true
-    return normalizeSubjectKey(subject.name) === normalizeSubjectKey(parsed.name)
+    return isSubjectMatch(parsed.name, subject.name)
   })
 
   const code = parsed.code || matchedDefault?.code || ''
-  const name = parsed.name || matchedDefault?.name || subjectName.toString().trim()
+  const name = matchedDefault?.name || parsed.name || subjectName.toString().trim()
 
   return {
     subjectCode: code ? code.toUpperCase() : '',
     subjectName: formatSubjectLabel({ code, name })
   }
 }
+
