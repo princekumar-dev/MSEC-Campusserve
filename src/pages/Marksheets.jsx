@@ -14,6 +14,7 @@ import { deriveOverallResult } from '../utils/resultUtils'
 import usePullToRefresh, { PullToRefreshIndicator } from '../hooks/usePullToRefresh.jsx'
 import { FixedSizeList as List } from 'react-window'
 import AnimatedCount from '../components/AnimatedCount'
+import { formatSubjectLabel, getDefaultSubjects } from '../../shared/subjectCatalog'
 
 function Marksheets() {
   const navigate = useNavigate()
@@ -309,6 +310,19 @@ function Marksheets() {
   }
 
   const downloadTemplate = () => {
+    const templateExam = createdExamination || examinationDetails
+    const defaultSubjects = getDefaultSubjects(
+      userData?.department,
+      templateExam?.year || userData?.year,
+      templateExam?.semester
+    )
+    const subjectHeaders = defaultSubjects.length > 0
+      ? defaultSubjects.map(formatSubjectLabel)
+      : [
+          'U24EN201 - Professional English',
+          'Subject Code - Subject Name'
+        ]
+
     const headers = [
       'Name',
       'RegNumber',
@@ -316,20 +330,12 @@ function Marksheets() {
       'Section',
       'ParentPhone',
       'Attendance',
-      'Engineerir',
-      'Data Struc',
-      'Database',
-      'Computer',
-      'Object Ori',
-      'Digital Log',
-      'Operating Software E',
-      'Computer Web Technologies'
+      ...subjectHeaders
     ]
 
     const sampleRows = [
-      ['Umaiyaswaran', '21CSE001', 'II', 'B', '8388520784', '92%', 85, 88, 82, 79, 91, 87, 84, 89],
-      ['Rohith S', '21CSE002', 'II', 'B', '8754401180', '88%', 78, 85, 81, 76, 88, 83, 79, 86],
-      ['Prince R', '21CSE003', 'II', 'B', '8778439728', '95%', 92, 94, 89, 87, 95, 91, 88, 93]
+      ['Student Name', '21CSE001', templateExam?.year || userData?.year || 'II', userData?.section || 'A', '9876543210', '92%', ...subjectHeaders.map(() => 85)],
+      ['Student Name 2', '21CSE002', templateExam?.year || userData?.year || 'II', userData?.section || 'A', '9876543211', '88%', ...subjectHeaders.map(() => 78)]
     ]
 
     const workbook = XLSX.utils.book_new()
@@ -342,8 +348,9 @@ function Marksheets() {
       ['2. Add one row per student and keep the header row untouched.'],
       ['3. Use numeric marks between 0-100. Use AB/Absent for absentees.'],
       ['4. Keep the first six columns (student info) filled for every row, including Attendance.'],
-      ['5. Rename, add, or remove subject columns as needed for your exam.'],
-      ['6. Save as XLSX before uploading to avoid formatting issues.']
+      ['5. Subject columns should use CODE - Subject Name. Example: U24EN201 - Professional English.'],
+      ['6. If you type Subject Name/Code, the upload will normalize it to CODE - Subject Name.'],
+      ['7. Save as XLSX before uploading to avoid formatting issues.']
     ])
     instructionsSheet['!cols'] = [{ wch: 90 }]
 
@@ -415,11 +422,12 @@ function Marksheets() {
 
       // Create examination date from the form details
       const examinationDate = new Date(`${examinationDetails.examinationYear}-${String(examinationDetails.examinationMonth).padStart(2, '0')}-01`)
+      const importExam = createdExamination || examinationDetails
       form.append('examinationDate', examinationDate.toISOString())
-      form.append('examinationName', examinationDetails.examinationName)
-      form.append('semester', examinationDetails.semester)
+      form.append('examinationName', importExam.examinationName)
+      form.append('semester', importExam.semester)
       form.append('department', userData.department)
-      form.append('year', userData.year)
+      form.append('year', importExam.year || userData.year)
 
       try {
         const data = await apiClient.post('/api/import-excel?action=upload', form)
@@ -952,7 +960,7 @@ function Marksheets() {
                   <h4 className="font-semibold text-yellow-900 mb-2">📋 Required Excel Format:</h4>
                   <p className="text-sm text-yellow-800 mb-2">Your Excel file should contain the following columns in this exact order:</p>
                   <div className="bg-white rounded-lg p-3 font-mono text-xs border">
-                    Name | RegNumber | Year | Section | ParentPhone | Attendance | Mathematics | Physics | Chemistry | Computer | English | ...
+                    Name | RegNumber | Year | Section | ParentPhone | Attendance | U24EN201 - Professional English | ...
                   </div>
                   <p className="text-xs text-yellow-700 mt-2">
                     • First 6 columns are required student details (includes Attendance)<br />
