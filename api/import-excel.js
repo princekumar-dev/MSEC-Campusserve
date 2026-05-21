@@ -2,6 +2,7 @@ import { connectToDatabase } from '../lib/mongo.js'
 import { ImportSession, Student, Marksheet, User } from '../models.js'
 import multer from 'multer'
 import XLSX from 'xlsx'
+import { normalizeSubject } from '../shared/subjectCatalog.js'
 
 // Configure multer for file uploads
 const upload = multer({ 
@@ -200,9 +201,10 @@ export default async function handler(req, res) {
 
               for (const subjectName of subjectFields) {
                 const rawValue = row[subjectName]
+                const normalizedSubject = normalizeSubject(subjectName, resolvedDepartment, yearParam, semester)
                 if (isAbsentValue(rawValue)) {
                   subjects.push({
-                    subjectName,
+                    ...normalizedSubject,
                     marks: null,
                     result: 'Absent'
                   })
@@ -215,7 +217,7 @@ export default async function handler(req, res) {
                   continue
                 }
                 subjects.push({
-                  subjectName: subjectName.trim(),
+                  ...normalizedSubject,
                   marks,
                   result: getResultFromMarks(marks)
                 })

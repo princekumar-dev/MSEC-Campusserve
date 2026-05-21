@@ -22,6 +22,22 @@ const LOGO_PATH = (() => {
   return fs.existsSync(logoPath) ? logoPath : null
 })()
 
+const PDF_FONT_PATHS = {
+  regular: path.resolve(process.cwd(), 'api', 'fonts', 'NotoSansTamil-Regular.ttf'),
+  bold: path.resolve(process.cwd(), 'api', 'fonts', 'NotoSansTamil-Bold.ttf')
+}
+
+const HAS_UNICODE_PDF_FONTS = fs.existsSync(PDF_FONT_PATHS.regular) && fs.existsSync(PDF_FONT_PATHS.bold)
+const PDF_FONTS = HAS_UNICODE_PDF_FONTS
+  ? { regular: 'NotoSansTamil', bold: 'NotoSansTamil-Bold' }
+  : { regular: 'Helvetica', bold: 'Helvetica-Bold' }
+
+const registerUnicodePdfFonts = (doc) => {
+  if (!HAS_UNICODE_PDF_FONTS) return
+  doc.registerFont(PDF_FONTS.regular, PDF_FONT_PATHS.regular)
+  doc.registerFont(PDF_FONTS.bold, PDF_FONT_PATHS.bold)
+}
+
 // Function to expand department abbreviations to full names
 const expandDepartmentName = (dept) => {
   const departmentMap = {
@@ -54,6 +70,7 @@ const generateLeavePDF = (leave) => {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ size: 'A4', margin: 50 })
+      registerUnicodePdfFonts(doc)
       const buffers = []
       const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right
 
@@ -75,7 +92,7 @@ const generateLeavePDF = (leave) => {
       }
 
       let textCursorY = headerTop + 5
-      const writeHeaderLine = (text, fontSize, fontName = 'Helvetica', spacing = 3, textOptions = {}) => {
+      const writeHeaderLine = (text, fontSize, fontName = PDF_FONTS.regular, spacing = 3, textOptions = {}) => {
         doc.font(fontName).fontSize(fontSize)
           .text(text, textBlockX, textCursorY, { width: textBlockWidth, align: 'center', ...textOptions })
         textCursorY = doc.y + spacing
@@ -84,14 +101,14 @@ const generateLeavePDF = (leave) => {
       const collegeName = 'MEENAKSHI SUNDARARAJAN ENGINEERING COLLEGE'
       let collegeFontSize = 15
       const minCollegeFontSize = 9
-      doc.font('Helvetica-Bold')
+      doc.font(PDF_FONTS.bold)
       while (doc.fontSize(collegeFontSize).widthOfString(collegeName) > textBlockWidth && collegeFontSize > minCollegeFontSize) {
         collegeFontSize -= 0.5
       }
-      writeHeaderLine(collegeName, collegeFontSize, 'Helvetica-Bold', 5)
-      writeHeaderLine('(AN AUTONOMOUS INSTITUTION AFFILIATED TO ANNA UNIVERSITY)', 9, 'Helvetica', 3)
-      writeHeaderLine('363, ARCOT ROAD, KODAMBAKKAM, CHENNAI-600024', 9, 'Helvetica', 8)
-      writeHeaderLine('LEAVE APPROVAL LETTER', 12, 'Helvetica-Bold', 8)
+      writeHeaderLine(collegeName, collegeFontSize, PDF_FONTS.bold, 5)
+      writeHeaderLine('(AN AUTONOMOUS INSTITUTION AFFILIATED TO ANNA UNIVERSITY)', 9, PDF_FONTS.regular, 3)
+      writeHeaderLine('363, ARCOT ROAD, KODAMBAKKAM, CHENNAI-600024', 9, PDF_FONTS.regular, 8)
+      writeHeaderLine('LEAVE APPROVAL LETTER', 12, PDF_FONTS.bold, 8)
 
       const headerBottom = Math.max(textCursorY, headerTop + logoHeight)
       doc.moveTo(doc.page.margins.left, headerBottom + 10).lineTo(doc.page.width - doc.page.margins.right, headerBottom + 10).lineWidth(1).stroke()
@@ -109,15 +126,15 @@ const generateLeavePDF = (leave) => {
       const infoValueX = doc.page.margins.left + infoLabelWidth + 5
       const infoLineGap = 20
       infoRows.forEach((row) => {
-        doc.font('Helvetica-Bold').fontSize(10.5)
+        doc.font(PDF_FONTS.bold).fontSize(10.5)
           .text(row.label, doc.page.margins.left, doc.y, { width: infoLabelWidth, align: 'left' })
-        doc.font('Helvetica').fontSize(10.5)
+        doc.font(PDF_FONTS.regular).fontSize(10.5)
           .text(row.value, infoValueX, doc.y - 13, { width: contentWidth - infoLabelWidth - 5, align: 'left' })
         doc.y += infoLineGap
       })
 
       doc.moveDown(2)
-      doc.font('Helvetica').fontSize(10.5)
+      doc.font(PDF_FONTS.regular).fontSize(10.5)
         .text('This is to certify that the above student\'s leave request has been reviewed and approved by the Head of the Department.', {
           align: 'left'
         })
@@ -132,8 +149,8 @@ const generateLeavePDF = (leave) => {
       }
       
       doc.lineWidth(0.5).moveTo(signatureRightX, signatureY).lineTo(signatureRightX + signatureWidth, signatureY).stroke()
-      doc.fontSize(8.5).font('Helvetica').text('Signature of HOD', signatureRightX, signatureY + 4, { width: signatureWidth, align: 'center' })
-      doc.fontSize(9).font('Helvetica-Bold').text(leave.hodName || 'HOD Name', signatureRightX, signatureY + 15, { width: signatureWidth, align: 'center' })
+      doc.fontSize(8.5).font(PDF_FONTS.regular).text('Signature of HOD', signatureRightX, signatureY + 4, { width: signatureWidth, align: 'center' })
+      doc.fontSize(9).font(PDF_FONTS.bold).text(leave.hodName || 'HOD Name', signatureRightX, signatureY + 15, { width: signatureWidth, align: 'center' })
 
       doc.fontSize(7.5).fillColor('#666666')
         .text(`Generated on ${new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}`, doc.page.margins.left, doc.page.height - doc.page.margins.bottom - 18, { width: contentWidth, align: 'right' })
@@ -151,6 +168,7 @@ const generateMarksheetPDF = (marksheet, staffSignature, hodSignature, staffName
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ size: 'A4', margin: 50 })
+      registerUnicodePdfFonts(doc)
       const buffers = []
       const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right
       
@@ -176,7 +194,7 @@ const generateMarksheetPDF = (marksheet, staffSignature, hodSignature, staffName
       }
 
       let textCursorY = headerTop + 5
-      const writeHeaderLine = (text, fontSize, fontName = 'Helvetica', spacing = 3, textOptions = {}) => {
+      const writeHeaderLine = (text, fontSize, fontName = PDF_FONTS.regular, spacing = 3, textOptions = {}) => {
         doc.font(fontName).fontSize(fontSize)
           .text(text, textBlockX, textCursorY, {
             width: textBlockWidth,
@@ -190,20 +208,20 @@ const generateMarksheetPDF = (marksheet, staffSignature, hodSignature, staffName
       const collegeName = 'MEENAKSHI SUNDARARAJAN ENGINEERING COLLEGE';
       let collegeFontSize = 15;
       const minCollegeFontSize = 9;
-      doc.font('Helvetica-Bold');
+      doc.font(PDF_FONTS.bold);
       // Reduce font size until the text fits in the textBlockWidth
       while (doc.fontSize(collegeFontSize).widthOfString(collegeName) > textBlockWidth && collegeFontSize > minCollegeFontSize) {
         collegeFontSize -= 0.5;
       }
-      writeHeaderLine(collegeName, collegeFontSize, 'Helvetica-Bold', 5)
-      writeHeaderLine('(AN AUTONOMOUS INSTITUTION AFFILIATED TO ANNA UNIVERSITY)', 9, 'Helvetica', 3)
-      writeHeaderLine('363, ARCOT ROAD, KODAMBAKKAM, CHENNAI-600024', 9, 'Helvetica', 6)
-      writeHeaderLine('OFFICE OF THE CONTROLLER OF EXAMINATIONS', 11, 'Helvetica-Bold', 6)
+      writeHeaderLine(collegeName, collegeFontSize, PDF_FONTS.bold, 5)
+      writeHeaderLine('(AN AUTONOMOUS INSTITUTION AFFILIATED TO ANNA UNIVERSITY)', 9, PDF_FONTS.regular, 3)
+      writeHeaderLine('363, ARCOT ROAD, KODAMBAKKAM, CHENNAI-600024', 9, PDF_FONTS.regular, 6)
+      writeHeaderLine('OFFICE OF THE CONTROLLER OF EXAMINATIONS', 11, PDF_FONTS.bold, 6)
 
       const examDate = new Date(marksheet.examinationDate)
       const monthYear = `${examDate.toLocaleString('default', { month: 'long' }).toUpperCase()} - ${examDate.getFullYear()}`
       const examText = `${(marksheet.examinationName || 'END SEMESTER EXAMINATIONS').toUpperCase()} - ${monthYear}`
-      writeHeaderLine(examText, 10, 'Helvetica-Bold', 0)
+      writeHeaderLine(examText, 10, PDF_FONTS.bold, 0)
 
       const headerBottom = Math.max(textCursorY, headerTop + logoHeight)
 
@@ -264,18 +282,18 @@ const generateMarksheetPDF = (marksheet, staffSignature, hodSignature, staffName
         const labelOptions = { width: infoLabelWidth }
         const valueOptions = { width: contentWidth - infoLabelWidth - 10 }
 
-        doc.font('Helvetica-Bold').fontSize(10.5)
+        doc.font(PDF_FONTS.bold).fontSize(10.5)
         const labelHeight = doc.heightOfString(`${row.label}:`, labelOptions)
 
-        doc.font('Helvetica').fontSize(10.5)
+        doc.font(PDF_FONTS.regular).fontSize(10.5)
         const valueHeight = doc.heightOfString(row.value, valueOptions)
 
         const rowHeight = Math.max(labelHeight, valueHeight)
         const rowY = doc.y
 
-        doc.font('Helvetica-Bold').fontSize(10.5)
+        doc.font(PDF_FONTS.bold).fontSize(10.5)
           .text(`${row.label}:`, doc.page.margins.left, rowY, labelOptions)
-        doc.font('Helvetica').fontSize(10.5)
+        doc.font(PDF_FONTS.regular).fontSize(10.5)
           .text(row.value, infoValueX, rowY, valueOptions)
 
         doc.y = rowY + rowHeight + infoLineGap
@@ -347,7 +365,7 @@ const generateMarksheetPDF = (marksheet, staffSignature, hodSignature, staffName
       const getRowHeight = (rowValues) => {
         let maxHeight = 0
         columns.forEach((col) => {
-          doc.font('Helvetica').fontSize(rowFontSize)
+          doc.font(PDF_FONTS.regular).fontSize(rowFontSize)
           maxHeight = Math.max(maxHeight, measureCellHeight(rowValues[col.key], col))
         })
         return Math.max(baseRowHeight, maxHeight + columnPaddingY * 2)
@@ -379,7 +397,7 @@ const generateMarksheetPDF = (marksheet, staffSignature, hodSignature, staffName
         }
         
         // Draw header text with vertical centering
-        doc.font('Helvetica-Bold').fontSize(11)
+        doc.font(PDF_FONTS.bold).fontSize(11)
         const textHeight = doc.heightOfString(col.label, {
           width: col.width - columnPaddingX * 2,
           align: col.align || 'center'
@@ -418,7 +436,7 @@ const generateMarksheetPDF = (marksheet, staffSignature, hodSignature, staffName
           }
           
           // Draw cell text with vertical centering
-          doc.font('Helvetica').fontSize(rowFontSize)
+          doc.font(PDF_FONTS.regular).fontSize(rowFontSize)
           const cellText = `${rowValues[col.key] ?? ''}`
           const textHeight = doc.heightOfString(cellText, {
             width: col.width - columnPaddingX * 2,
@@ -446,7 +464,7 @@ const generateMarksheetPDF = (marksheet, staffSignature, hodSignature, staffName
       // Overall result and total subjects with better spacing
       doc.moveDown(0.5)
       const overallResultText = deriveOverallFromSubjects(subjects)
-      doc.fontSize(11).font('Helvetica-Bold')
+      doc.fontSize(11).font(PDF_FONTS.bold)
         .fillColor('#000000')
         .text('Overall Result: ', doc.page.margins.left, tableBottom, {
           width: contentWidth / 2,
@@ -458,7 +476,7 @@ const generateMarksheetPDF = (marksheet, staffSignature, hodSignature, staffName
           continued: false
         })
       doc.fillColor('#000000')
-      doc.font('Helvetica').fontSize(11)
+      doc.font(PDF_FONTS.regular).fontSize(11)
         .text(`Total Subjects: ${subjects.length}`, doc.page.margins.left + contentWidth / 2, tableBottom, {
           width: contentWidth / 2,
           align: 'right'
@@ -496,14 +514,14 @@ const generateMarksheetPDF = (marksheet, staffSignature, hodSignature, staffName
         doc.lineWidth(1)
 
         // Signature label - centered
-        doc.fontSize(8.5).font('Helvetica')
+        doc.fontSize(8.5).font(PDF_FONTS.regular)
           .text(slot.label, slotX + 12, signatureY + 5, {
             width: slotWidth - 24,
             align: 'center'
           })
         
         // Name below signature line with better spacing - centered
-        doc.fontSize(9).font('Helvetica-Bold')
+        doc.fontSize(9).font(PDF_FONTS.bold)
           .text(slot.name, slotX + 12, signatureY + 18, {
             width: slotWidth - 24,
             align: 'center'
