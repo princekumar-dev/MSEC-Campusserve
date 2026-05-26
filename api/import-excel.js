@@ -24,6 +24,25 @@ const upload = multer({
 
 const PASS_MARK_THRESHOLD = 50
 const ABSENT_TOKENS = ['AB', 'ABS', 'ABSENT']
+
+// Case-insensitive column matching function
+const findColumnKey = (row, possibleNames) => {
+  const rowKeys = Object.keys(row)
+  // First try exact match
+  for (const possibleName of possibleNames) {
+    if (rowKeys.includes(possibleName)) return possibleName
+  }
+  // Then try case-insensitive match
+  const normalizedPossible = possibleNames.map(name => name.toLowerCase().trim().replace(/\s+/g, ''))
+  for (const rowKey of rowKeys) {
+    const normalizedRowKey = rowKey.toLowerCase().trim().replace(/\s+/g, '')
+    if (normalizedPossible.includes(normalizedRowKey)) {
+      return rowKey
+    }
+  }
+  return null
+}
+
 const normalizePhone = (value) => {
   if (!value) return ''
   const cleaned = value.toString().trim().replace(/[^0-9+]/g, '')
@@ -157,102 +176,137 @@ export default async function handler(req, res) {
               const row = jsonData[i]
               const rowNum = i + 2 // Excel row number (1-indexed + header)
 
-              // Helper for flexible column matching (ignores spaces and case)
-              const getValAndKey = (possibleKeys) => {
-                const matchedKey = Object.keys(row).find(k => possibleKeys.includes(k.replace(/\\s+/g, '').toLowerCase()))
-                return { val: matchedKey ? row[matchedKey] : undefined, key: matchedKey }
-              }
+              try {
+                // Use case-insensitive column matching
+                const nameKey = findColumnKey(row, ['Name', 'StudentName', 'Student'])
+                const regNumberKey = findColumnKey(row, ['RegNumber', 'Register', 'RegNo', 'RollNo', 'RegistrationNumber'])
+                const sectionKey = findColumnKey(row, ['Section', 'Sec', 'Class'])
+                const attendanceKey = findColumnKey(row, ['Attendance', 'Attendance%', 'AttendancePercentage'])
+                const parentPhoneKey = findColumnKey(row, ['ParentPhone', 'ParentPhoneNumber', 'Phone', 'PhoneNumber', 'Mobile', 'MobileNumber'])
 
-              const nameRes = getValAndKey(['name', 'studentname', 'student'])
-              const regNumberRes = getValAndKey(['regnumber', 'register', 'regno', 'rollno', 'registerbumber', 'registernumber'])
-              const sectionRes = getValAndKey(['section', 'sec', 'class'])
-              const attendanceRes = getValAndKey(['attendance', 'attendance%'])
-              const parentPhoneRes = getValAndKey(['parentphone', 'parentphonenumber', 'phone', 'phonenumber', 'mobile', 'mobilenumber'])
-              const examNameRes = getValAndKey(['examinationname', 'examname', 'exam'])
-              const examDateRes = getValAndKey(['examinationdate', 'examdate', 'date'])
+                const nameRaw = nameKey ? row[nameKey] : undefined
+                const regNumberRaw = regNumberKey ? row[regNumberKey] : undefined
+                const sectionRaw = sectionKey ? row[sectionKey] : undefined
+                const attendanceRaw = attendanceKey ? row[attendanceKey] : undefined
+                const parentPhoneRaw = parentPhoneKey ? row[parentPhoneKey] : undefined
 
-              const nameRaw = nameRes.val
-              const regNumberRaw = regNumberRes.val
-              const sectionRaw = sectionRes.val
-              const attendanceRaw = attendanceRes.val
-              const parentPhoneRaw = parentPhoneRes.val
+                // Required fields validation with specific error messages
+                if (!nameRaw || nameRaw === '') {
+                  errorMessages.push(`Row ${rowNum}: Missing required field "Name"`)
+                  continue
+                }
+                if (!regNumberRaw || regNumberRaw === '') {
+                  errorMessages.push(`Row ${rowNum}: Missing required field "Registration Number" (Columns: RegNumber, Register, RegNo, RollNo)`)
+                  continue
+                }
+                if (!sectionRaw || sectionRaw === '') {
+                  errorMessages.push(`Row ${rowNum}: Missing required field "Section"`)
+                  continue
+                }
+                if (!parentPhoneRaw || parentPhoneRaw === '') {
+                  errorMessages.push(`Row ${rowNum}: Missing required field "Parent Phone" (Columns: ParentPhone, ParentPhoneNumber, Phone, Mobile)`)
+                  continue
+                }
+                if (attendanceRaw === undefined || attendanceRaw === null || attendanceRaw === '') {
+                  errorMessages.push(`Row ${rowNum}: Missing required field "Attendance" or "Attendance%"`)
+                  continue
+                }
 
-              // Required fields validation
-              if (!nameRaw || !regNumberRaw || !sectionRaw || !parentPhoneRaw || attendanceRaw === undefined || attendanceRaw === null || attendanceRaw === '') {
-                errorMessages.push(`Row ${rowNum}: Missing required fields (Name, RegNumber, Section, ParentPhone, Attendance)`)
-                continue
-              }
+                // Extract subject marks (all columns that aren't basic student info)
+                const knownColumnsNormalized = [
+                  'name', 'studentname', 'student',
+                  'regnumber', 'register', 'regno', 'rollno', 'registernumber',
+                  'year', 'section', 'sec', 'class',
+                  'parentphone', 'parentphonenumber', 'phone', 'phonenumber', 'mobile', 'mobilenumber',
+                  'attendance', 'attendance%', 'attendancepercentage',
+                  'examinationname', 'examname', 'exam',
+                  'examinationdate', 'examdate', 'date'
+                ]
+                
+                const subjects = []
+                const subjectFields = Object.keys(row).filter(key => {
+                  const normalizedKey = key.toLowerCase().trim().replace(/\s+/g, '')
+                  return !knownColumnsNormalized.includes(normalizedKey) && !normalizedKey.startsWith('attendance')
+                })
 
-              // Extract subject marks (all columns that aren't basic student info)
-              const knownColumns = [
-                'name', 'studentname', 'student',
-                'regnumber', 'register', 'regno', 'rollno', 'registerbumber', 'registernumber',
-                'year', 'section', 'sec', 'class',
-                'parentphone', 'parentphonenumber', 'phone', 'phonenumber', 'mobile', 'mobilenumber',
-                'attendance', 'attendance%',
-                'examinationname', 'examname', 'exam',
-                'examinationdate', 'examdate', 'date'
-              ]
-              const subjects = []
-              const subjectFields = Object.keys(row).filter(key => {
-                const normalizedKey = key.replace(/\\s+/g, '').toLowerCase()
-                return !knownColumns.includes(normalizedKey) && !normalizedKey.startsWith('attendance')
-              })
+                for (const subjectName of subjectFields) {
+                  const rawValue = row[subjectName]
+                  
+                  // Skip empty cells
+                  if (rawValue === undefined || rawValue === null || rawValue === '') {
+                    continue
+                  }
 
-              for (const subjectName of subjectFields) {
-                const rawValue = row[subjectName]
-                const normalizedSubject = normalizeSubject(subjectName, resolvedDepartment, yearParam, semester)
-                if (isAbsentValue(rawValue)) {
+                  const normalizedSubject = normalizeSubject(subjectName, resolvedDepartment, yearParam, semester)
+                  
+                  if (isAbsentValue(rawValue)) {
+                    subjects.push({
+                      ...normalizedSubject,
+                      marks: null,
+                      result: 'Absent'
+                    })
+                    continue
+                  }
+
+                  // Check if value looks like a formula (Excel formulas start with =)
+                  const valueStr = rawValue.toString().trim()
+                  if (valueStr.startsWith('=')) {
+                    errorMessages.push(`Row ${rowNum}, Column "${subjectName}": Contains Excel formula instead of value. Please convert formulas to values before importing.`)
+                    continue
+                  }
+
+                  const marks = parseFloat(valueStr)
+                  if (isNaN(marks)) {
+                    errorMessages.push(`Row ${rowNum}, Column "${subjectName}": Invalid marks value "${rawValue}". Expected a number.`)
+                    continue
+                  }
+                  if (marks < 0 || marks > 100) {
+                    errorMessages.push(`Row ${rowNum}, Column "${subjectName}": Marks ${marks} out of valid range (0-100)`)
+                    continue
+                  }
+                  
                   subjects.push({
                     ...normalizedSubject,
-                    marks: null,
-                    result: 'Absent'
+                    marks,
+                    result: getResultFromMarks(marks)
                   })
+                }
+
+                if (subjects.length === 0) {
+                  errorMessages.push(`Row ${rowNum}: No valid subject marks found. Please check that subject columns contain numeric values or 'AB' for absent.`)
                   continue
                 }
 
-                const marks = parseFloat(rawValue)
-                if (isNaN(marks) || marks < 0 || marks > 100) {
-                  errorMessages.push(`Row ${rowNum}: Invalid marks for ${subjectName}: ${rawValue}`)
-                  continue
-                }
-                subjects.push({
-                  ...normalizedSubject,
-                  marks,
-                  result: getResultFromMarks(marks)
+                studentsData.push({
+                  name: nameRaw.toString().trim(),
+                  regNumber: regNumberRaw.toString().trim(),
+                  year: yearParam,
+                  section: sectionRaw.toString().trim(),
+                  parentPhoneNumber: normalizePhone(parentPhoneRaw),
+                  attendance: normalizeAttendance(attendanceRaw),
+                  examinationName: derivedExamName,
+                  examinationDate: derivedExamDate,
+                  subjects
                 })
-              }
-
-              if (subjects.length === 0) {
-                errorMessages.push(`Row ${rowNum}: No valid subject marks found`)
+              } catch (rowErr) {
+                errorMessages.push(`Row ${rowNum}: Error processing row - ${rowErr.message}`)
                 continue
               }
-
-              studentsData.push({
-                name: nameRaw.toString().trim(),
-                regNumber: regNumberRaw.toString().trim(),
-                year: yearParam,
-                section: sectionRaw.toString().trim(),
-                parentPhoneNumber: normalizePhone(parentPhoneRaw),
-                attendance: normalizeAttendance(attendanceRaw),
-                examinationName: examNameRes.val ? examNameRes.val.toString().trim() : derivedExamName,
-                examinationDate: examDateRes.val ? new Date(examDateRes.val) : derivedExamDate,
-                subjects
-              })
             }
 
             if (errorMessages.length > 0) {
               return res.status(400).json({ 
                 success: false, 
-                error: 'Excel file contains formatting or validation errors.',
-                errorMessages 
+                error: `Excel file contains ${errorMessages.length} validation error(s). Please review and fix the following issues:`,
+                errorMessages,
+                errorCount: errorMessages.length
               })
             }
 
             if (studentsData.length === 0) {
               return res.status(400).json({ 
                 success: false, 
-                error: 'No valid student data found',
+                error: 'No valid student data found. Please check that your Excel file has the required columns and valid data.',
                 errorMessages 
               })
             }
@@ -267,7 +321,7 @@ export default async function handler(req, res) {
               examinationDate: derivedExamDate,
               studentsData,
               status: 'pending',
-              errorMessages: []
+              errorMessages: errorMessages.length > 0 ? errorMessages : []
             })
 
             await importSession.save()
@@ -282,9 +336,21 @@ export default async function handler(req, res) {
 
           } catch (parseErr) {
             console.error('Excel parsing error:', parseErr)
+            
+            // Provide specific error messages based on error type
+            let userMessage = 'Failed to parse Excel file.'
+            if (parseErr.message.includes('XLSX')) {
+              userMessage = 'Invalid Excel file format. Please ensure you\'re uploading a valid .xlsx or .xls file.'
+            } else if (parseErr.message.includes('memory')) {
+              userMessage = 'File is too large. Maximum file size is 10MB.'
+            } else if (parseErr.message) {
+              userMessage = `Parse error: ${parseErr.message}`
+            }
+            
             return res.status(400).json({ 
               success: false, 
-              error: 'Failed to parse Excel file. Please check the format.' 
+              error: userMessage,
+              errorMessages: [userMessage]
             })
           }
         })

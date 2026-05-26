@@ -69,7 +69,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: 'Invalid action' })
       }
 
-      const { type, regNumber, phoneNumber, reason, startDate, endDate, expectedArrivalTime } = req.body
+      const { type, regNumber, phoneNumber, reason, attachmentData, startDate, endDate, expectedArrivalTime } = req.body
       if (!type || !reason) {
         return res.status(400).json({ success: false, error: 'type and reason are required' })
       }
@@ -100,6 +100,7 @@ export default async function handler(req, res) {
           parentPhoneNumber: normalizePhone(student.parentPhoneNumber)
         },
         reason,
+        attachmentData: attachmentData || null,
       })
       if (type === 'leave') {
         if (!startDate || !endDate) {
@@ -112,6 +113,7 @@ export default async function handler(req, res) {
           return res.status(400).json({ success: false, error: 'expectedArrivalTime is required for late' })
         }
         doc.expectedArrivalTime = new Date(expectedArrivalTime)
+        doc.status = 'waiting_for_arrival_confirmation'
       }
 
       await doc.save()
@@ -139,17 +141,27 @@ export default async function handler(req, res) {
         }
       } else {
         const staff = await User.findOne({ role: 'staff', department: student.department, year: student.year, section: student.section }).lean()
+        const reasonText = reason ? ` Reason: ${reason}` : ''
         if (staff?.email) {
           await storeNotification({
             userEmail: staff.email,
-            title: 'Late Arrival Notification',
-            body: `${student.name} expects to arrive late`,
-            data: { leaveId: doc._id.toString(), type: 'late' }
+            type: 'late_request_started',
+            title: 'Late Request Started',
+            body: `${student.name} (${student.regNumber}) expects to arrive late.${reasonText}`,
+            data: {
+              leaveId: doc._id.toString(),
+              requestId: doc._id.toString(),
+              studentName: student.name,
+              regNumber: student.regNumber,
+              reason,
+              expectedArrivalTime: doc.expectedArrivalTime,
+              type: 'late'
+            }
           })
           try {
             await sendBroadcastNotification(
               '🔔 Late Arrival',
-              `${student.name} expects to arrive late`,
+              `${student.name} (${student.regNumber}) expects to arrive late.${reasonText}`,
               { type: 'late_arrival', leaveId: doc._id.toString(), department: student.department }
             )
           } catch (bErr) {
@@ -229,8 +241,23 @@ export default async function handler(req, res) {
 
         // Notify parent on WhatsApp with leave letter PDF attachment
         console.log('🔍 [Leave Approval] Starting WhatsApp dispatch via Evolution API...')
-        // Use HOD-scoped Evolution API instance if HOD is present so message originates from HOD's connected number
-        const evo = hod && hod._id ? getEvolutionApiForStaff(String(hod._id)) : evolutionApi
+        
+        // Find the class teacher (staff) for this student to use their WhatsApp instance
+        const classTeacher = await User.findOne({ 
+          role: 'staff', 
+          department: request.studentDetails.department, 
+          year: request.studentDetails.year, 
+          section: request.studentDetails.section 
+        }).lean()
+        
+        // Use Class Teacher's Evolution API instance if available, so message originates from Class Teacher's connected number
+        const evo = classTeacher && classTeacher._id ? getEvolutionApiForStaff(String(classTeacher._id)) : evolutionApi
+        if (classTeacher) {
+          console.log(`🔍 Found Class Teacher for WhatsApp dispatch: ${classTeacher.name} (${classTeacher._id})`)
+        } else {
+          console.log('🔍 Class Teacher not found, falling back to global Evolution API instance')
+        }
+        
         console.log('🔍 Evolution API configured (for this sender):', evo.isConfigured())
         console.log('🔍 Parent phone from request:', request.studentDetails?.parentPhoneNumber)
         
@@ -528,7 +555,14 @@ MSEC Academics Department`
 
         // Send only a plain text WhatsApp message to parent with rejection + reason (no attachments)
         try {
-          const evo = request.hodId ? getEvolutionApiForStaff(String(request.hodId)) : evolutionApi
+          const classTeacher = await User.findOne({ 
+            role: 'staff', 
+            department: request.studentDetails.department, 
+            year: request.studentDetails.year, 
+            section: request.studentDetails.section 
+          }).lean()
+          const evo = classTeacher && classTeacher._id ? getEvolutionApiForStaff(String(classTeacher._id)) : evolutionApi
+          
           if (evo.isConfigured()) {
             const parentPhone = request.studentDetails?.parentPhoneNumber
             if (parentPhone) {
@@ -597,10 +631,71 @@ MSEC Academics Department`
         await request.save()
         console.log('✅ [confirm-arrival] Request saved successfully')
 
+        const staffTargets = []
+        if (request.staffId) {
+          const staffById = await User.findById(request.staffId).lean()
+          if (staffById?.email) staffTargets.push(staffById)
+        }
+
+        if (staffTargets.length === 0) {
+          const staffList = await User.find({
+            role: 'staff',
+            department: request.studentDetails?.department,
+            year: request.studentDetails?.year,
+            section: request.studentDetails?.section
+          }).lean()
+          staffTargets.push(...(staffList || []))
+        }
+
+        if (staffTargets.length > 0) {
+          const timeStr = new Date(request.arrivalConfirmedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+          const reasonText = request.reason ? ` Reason: ${request.reason}` : ''
+          const seenEmails = new Set()
+
+          for (const staffTarget of staffTargets) {
+            const email = staffTarget?.email
+            if (!email || seenEmails.has(email)) continue
+            seenEmails.add(email)
+
+            try {
+              const mongoose = await connectToDatabase()
+              const db = mongoose.connection.db
+              await db.collection('notifications').updateMany(
+                {
+                  userEmail: email,
+                  type: 'late_request_started',
+                  'data.leaveId': request._id.toString(),
+                  read: { $ne: true }
+                },
+                { $set: { read: true, readAt: new Date() } }
+              )
+            } catch (cleanupErr) {
+              console.warn('⚠️ Failed to mark old late request notification as read:', cleanupErr?.message)
+            }
+
+            await storeNotification({
+              userEmail: email,
+              type: 'late_arrival_confirmed',
+              title: 'Late Arrival Confirmed',
+              body: `${request.studentDetails?.name} reached late at ${timeStr}.${reasonText}`,
+              data: {
+                leaveId: request._id.toString(),
+                requestId: request._id.toString(),
+                studentName: request.studentDetails?.name,
+                regNumber: request.studentDetails?.regNumber,
+                reason: request.reason,
+                arrivalConfirmedAt: request.arrivalConfirmedAt,
+                type: 'late'
+              }
+            })
+          }
+        }
+
         // Send broadcast notification to trigger real-time updates on all open pages
+        const reasonText = request.reason ? ` Reason: ${request.reason}` : ''
         await sendBroadcastNotification(
           '🔔 Late Arrival Update',
-          `${request.studentDetails.name} has confirmed their arrival`,
+          `${request.studentDetails.name} has confirmed their arrival.${reasonText}`,
           {
             type: 'late_arrival',
             leaveId: request._id.toString(),

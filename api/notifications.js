@@ -263,6 +263,45 @@ router.put('/:id/read', async (req, res) => {
   }
 })
 
+// Delete notification permanently
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+
+    if (!id) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Notification ID is required' 
+      })
+    }
+
+    const mongoose = await connectToDatabase()
+    const db = mongoose.connection.db
+    const ObjectId = (await import('mongodb')).ObjectId
+
+    const collection = db.collection('notifications')
+    const result = await collection.deleteOne({ _id: new ObjectId(id) })
+
+    if (result.deletedCount > 0) {
+      res.json({ 
+        success: true, 
+        message: 'Notification deleted' 
+      })
+    } else {
+      res.status(404).json({ 
+        success: false, 
+        message: 'Notification not found' 
+      })
+    }
+  } catch (error) {
+    console.error('Delete notification error:', error)
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error' 
+    })
+  }
+})
+
 // Get VAPID public key
 router.get('/vapid-public-key', (req, res) => {
   res.json({ success: true, publicKey: VAPID_PUBLIC_KEY })

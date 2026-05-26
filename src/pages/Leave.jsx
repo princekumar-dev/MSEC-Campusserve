@@ -27,6 +27,9 @@ function Leave() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [expectedArrivalTime, setExpectedArrivalTime] = useState('')
+  const [attachment, setAttachment] = useState(null)
+  const [attachmentName, setAttachmentName] = useState('')
+  const [currentTime, setCurrentTime] = useState(new Date())
   const [submitting, setSubmitting] = useState(false)
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(false)
@@ -39,6 +42,7 @@ function Leave() {
   const [arrivalTime, setArrivalTime] = useState(null) // Store the actual arrival time
   const [confirmAction, setConfirmAction] = useState(null)
   const [confirmingArrivalId, setConfirmingArrivalId] = useState(null)
+  const [isTimerModalOpen, setIsTimerModalOpen] = useState(false)
 
   const studentId = auth.id
 
@@ -75,11 +79,48 @@ function Leave() {
     const handleGlobal = () => fetchRequests(true)
     window.addEventListener('notificationsUpdated', handleGlobal)
     window.addEventListener('marksheetsUpdated', handleGlobal)
+    
+    // Live clock timer
+    const clockTimer = setInterval(() => setCurrentTime(new Date()), 1000)
+    
     return () => {
       window.removeEventListener('notificationsUpdated', handleGlobal)
       window.removeEventListener('marksheetsUpdated', handleGlobal)
+      clearInterval(clockTimer)
     }
   }, [])
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setAttachmentName(file.name)
+    
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const MAX_WIDTH = 800
+        let width = img.width
+        let height = img.height
+
+        if (width > MAX_WIDTH) {
+          height = Math.round((height * MAX_WIDTH) / width)
+          width = MAX_WIDTH
+        }
+
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, width, height)
+        
+        const base64Str = canvas.toDataURL('image/jpeg', 0.6)
+        setAttachment(base64Str)
+      }
+      img.src = event.target.result
+    }
+    reader.readAsDataURL(file)
+  }
 
   // Listen for push notifications and page focus changes
   usePushNotifications({
@@ -236,6 +277,9 @@ function Leave() {
         const today = new Date().toISOString().split('T')[0]
         body.expectedArrivalTime = `${today}T${expectedArrivalTime}`
       }
+      if (attachment) {
+        body.attachmentData = attachment
+      }
       const data = await apiClient.post('/api/leaves?action=create', body)
       if (data && data.success) {
         showSuccess('Request submitted', `${type === 'leave' ? 'Leave' : 'Late'} request created`)
@@ -244,7 +288,16 @@ function Leave() {
         setStartDate('')
         setEndDate('')
         setExpectedArrivalTime('')
-        setType('leave')
+        setAttachment(null)
+        setAttachmentName('')
+        if (type === 'late' && data.request) {
+          setRecordingRequest(data.request)
+          setRecordingTime(0)
+          setArrivalTime(null)
+          setIsTimerModalOpen(true)
+        } else {
+          setType('leave')
+        }
         // Force-fetch to bypass cached responses so the new request appears immediately
         fetchRequests(true)
       } else {
@@ -288,6 +341,7 @@ function Leave() {
         sessionStorage.removeItem('activeTimer') // Clear timer from sessionStorage
         setRecordingRequest(null)
         setRecordingTime(0)
+        setIsTimerModalOpen(false)
         fetchRequests(true)
       } else {
         showError('Failed', data.error || 'Could not confirm arrival')
@@ -338,156 +392,362 @@ function Leave() {
     })
   }
 
+  // Calculate form completion percentage
+  const formCompletion = useMemo(() => {
+    let completed = 0
+    let total = 2 // reason + type
+    
+    if (reason.trim()) completed++
+    
+    if (type === 'leave') {
+      total += 2 // dates
+      if (startDate) completed++
+      if (endDate) completed++
+    } else {
+      total += 1 // arrival time
+      if (expectedArrivalTime) completed++
+    }
+    
+    return Math.round((completed / total) * 100)
+  }, [reason, type, startDate, endDate, expectedArrivalTime])
+
   return (
     <>
-    <div className="px-4 py-4 w-full max-w-4xl mx-auto">
+    <div className="px-3 sm:px-4 py-4 w-full max-w-5xl mx-auto">
       <style>{styles}</style>
       <ConfettiContainer />
-      <h1 className="text-2xl font-bold mb-4">Leave / Late</h1>
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow p-5 mb-6 space-y-5">
-        {/* Segmented control */}
-        <div className="segmented-control relative p-1 rounded-xl bg-white">
+      
+      {/* Header */}
+      <div className="mb-4">
+        <h1 className="text-xl sm:text-2xl font-bold">Leave / Late Request</h1>
+      </div>
+
+      <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-lg mb-6 overflow-hidden">
+        {/* Progress Bar */}
+        <div className="h-1 bg-gray-100 relative overflow-hidden">
           <div 
-            className="segmented-highlight"
-            style={{ 
-              left: type==='leave' ? '0.25rem' : 'calc(50% + 0.25rem)',
-              width: 'calc(50% - 0.5rem)'
-            }} 
+            className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-300"
+            style={{ width: `${formCompletion}%` }}
           />
-          <div className="grid grid-cols-2 gap-0">
-            <button 
-              type="button" 
-              onClick={() => setType('leave')} 
-              className={`relative z-10 px-4 py-3 rounded-xl text-sm font-bold transition-all ${type==='leave' ? 'text-blue-700' : 'text-blue-600 hover:bg-blue-50'}`}
-            >
-              Leave
-            </button>
-            <button 
-              type="button" 
-              onClick={() => setType('late')} 
-              className={`relative z-10 px-4 py-3 rounded-xl text-sm font-bold transition-all ${type==='late' ? 'text-blue-700' : 'text-blue-600 hover:bg-blue-50'}`}
-            >
-              Late
-            </button>
-          </div>
         </div>
 
-        {/* Reason with counter */}
-        <div>
-          <label className="block text-sm font-semibold mb-1">Reason</label>
-          <div className="relative">
-            <input 
-              value={reason} 
-              onChange={e=>setReason(e.target.value)} 
-              onBlur={() => setReasonTouched(true)}
-              maxLength={300}
-              className={`w-full border rounded-xl px-3 py-3 pr-14 transition-all ${reasonTouched && !reason.trim() ? 'border-red-400 focus:border-red-500' : 'border-gray-300 focus:border-blue-500'} ${reasonCount > 160 ? 'pulse-glow' : ''}`}
-              placeholder="Briefly explain your reason (e.g., Medical checkup)" 
-            />
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 pointer-events-none">{reasonCount}/{reasonMax}</div>
-          </div>
-          {reasonTouched && !reason.trim() && (
-            <p className="text-xs text-red-600 mt-1">Please provide a reason.</p>
-          )}
-        </div>
-        {type === 'leave' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-semibold mb-1">Start Date</label>
-              <input 
-                type="date" 
-                value={startDate} 
-                onChange={e=>setStartDate(e.target.value)} 
-                min={new Date().toISOString().split('T')[0]}
-                className="w-full border rounded-xl px-3 py-3" 
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold mb-1">End Date</label>
-              <input 
-                type="date" 
-                value={endDate} 
-                onChange={e=>setEndDate(e.target.value)} 
-                min={startDate || new Date().toISOString().split('T')[0]}
-                className="w-full border rounded-xl px-3 py-3" 
-              />
-            </div>
-            <div className="md:col-span-2 text-sm text-gray-600">{startDate && endDate ? `Total days: ${daysCount}` : 'Select dates to compute total days'}</div>
-          </div>
-        ) : (
+        <div className="p-4 sm:p-5 space-y-4">
+          {/* Form Type Selector */}
           <div>
-            <label className="block text-sm font-semibold mb-1">Expected Arrival Time</label>
-            <div className="flex items-center gap-3 mb-1">
-              <div className="flex-1">
-                <input 
-                  type="date" 
-                  value={new Date().toISOString().split('T')[0]} 
-                  disabled 
-                  className="w-full border rounded-xl px-3 py-3 bg-gray-100 text-gray-600 cursor-not-allowed" 
-                />
-              </div>
-              <div className="flex-1">
-                <input 
-                  type="time" 
-                  value={expectedArrivalTime} 
-                  onChange={e=>setExpectedArrivalTime(e.target.value)} 
-                  className="w-full border rounded-xl px-3 py-3" 
-                  required
-                />
+            <label className="block text-xs font-bold mb-2 text-gray-700">REQUEST TYPE</label>
+            <div className="segmented-control relative p-1 rounded-xl bg-gray-50 border border-gray-200">
+              <div 
+                className="segmented-highlight"
+                style={{ 
+                  left: type==='leave' ? '0.25rem' : 'calc(50% + 0.25rem)',
+                  width: 'calc(50% - 0.5rem)'
+                }} 
+              />
+              <div className="grid grid-cols-2 gap-0">
+                <button 
+                  type="button" 
+                  onClick={() => setType('leave')} 
+                  className={`relative z-10 px-4 py-2 rounded-lg text-xs font-bold transition-all ${type==='leave' ? 'text-blue-700' : 'text-gray-600 hover:text-gray-800'}`}
+                >
+                  Leave
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setType('late')} 
+                  className={`relative z-10 px-4 py-2 rounded-lg text-xs font-bold transition-all ${type==='late' ? 'text-blue-700' : 'text-gray-600 hover:text-gray-800'}`}
+                >
+                  Late Arrival
+                </button>
               </div>
             </div>
-            <p className="text-xs text-gray-600">Tip: Defaults to +30 minutes from now</p>
           </div>
-        )}
-        <div className="flex items-center gap-3">
-          <button disabled={submitting} className="px-5 py-3 rounded-xl bg-blue-600 text-white disabled:opacity-50 transition-transform hover:scale-[1.02]">Submit</button>
-          <button type="button" onClick={() => { setType('leave'); setReason(''); setReasonTouched(false); setStartDate(''); setEndDate(''); setExpectedArrivalTime('') }} className="px-4 py-3 rounded-xl border text-gray-700">Clear</button>
+
+          {/* Reason Section */}
+          <div>
+            <label className="block text-xs font-bold mb-1.5 text-gray-700">REASON</label>
+            <div className="relative">
+              <textarea 
+                value={reason} 
+                onChange={e=>setReason(e.target.value)} 
+                onBlur={() => setReasonTouched(true)}
+                maxLength={200}
+                rows={type === 'leave' ? 3 : 2}
+                className={`w-full border rounded-lg px-3 py-2 pb-7 text-sm transition-all resize-none focus:outline-none ${reasonTouched && !reason.trim() ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-200' : 'border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-100'} ${reasonCount > 160 ? 'pulse-glow' : ''}`}
+                placeholder={type === 'leave' ? "Medical appointment, family emergency..." : "Traffic delay, vehicle breakdown..."} 
+              />
+              <div className="absolute right-3 bottom-2 text-xs font-semibold px-2 py-0.5 rounded bg-gray-100 text-gray-500">{reasonCount}/200</div>
+            </div>
+            {reasonTouched && !reason.trim() && (
+              <p className="text-xs text-red-600 mt-1 font-semibold">⚠ Reason required</p>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="h-px bg-gray-100" />
+
+          {/* Leave-specific fields */}
+          {type === 'leave' ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="relative">
+                  <label className="block text-xs font-bold mb-1 text-gray-700">Start Date</label>
+                  <div className="relative">
+                    <input 
+                      type="date" 
+                      value={startDate} 
+                      onChange={e=>setStartDate(e.target.value)} 
+                      min={new Date().toISOString().split('T')[0]}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-100 focus:outline-none transition-all cursor-pointer" 
+                    />
+                  </div>
+                </div>
+                <div className="relative">
+                  <label className="block text-xs font-bold mb-1 text-gray-700">End Date</label>
+                  <div className="relative">
+                    <input 
+                      type="date" 
+                      value={endDate} 
+                      onChange={e=>setEndDate(e.target.value)} 
+                      min={startDate || new Date().toISOString().split('T')[0]}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-100 focus:outline-none transition-all cursor-pointer" 
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Duration Summary Card */}
+              {startDate && endDate && (
+                <div className="p-3 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg border border-blue-100">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                    <div>
+                      <p className="text-xs text-gray-600 font-semibold">Total</p>
+                      <p className="text-lg font-bold text-blue-600">{daysCount}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600 font-semibold">Weekends</p>
+                      <p className="text-lg font-bold text-purple-600">
+                        {(() => {
+                          let weekends = 0
+                          for (let d = new Date(startDate); d <= new Date(endDate); d.setDate(d.getDate() + 1)) {
+                            if (d.getDay() === 0 || d.getDay() === 6) weekends++
+                          }
+                          return weekends
+                        })()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600 font-semibold">Working</p>
+                      <p className="text-lg font-bold text-green-600">
+                        {(() => {
+                          let weekends = 0
+                          for (let d = new Date(startDate); d <= new Date(endDate); d.setDate(d.getDate() + 1)) {
+                            if (d.getDay() === 0 || d.getDay() === 6) weekends++
+                          }
+                          return daysCount - weekends
+                        })()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600 font-semibold">Status</p>
+                      <p className={`text-xs font-bold ${daysCount >= 5 ? 'text-red-600' : daysCount >= 2 ? 'text-orange-600' : 'text-green-600'}`}>
+                        {daysCount >= 5 ? 'Long' : daysCount >= 2 ? 'Moderate' : 'Short'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold mb-1 text-gray-700">Date (Today)</label>
+                  <input 
+                    type="date" 
+                    value={new Date().toISOString().split('T')[0]} 
+                    disabled 
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 bg-gray-100 text-gray-600 text-sm cursor-not-allowed" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold mb-1 text-gray-700">Arrival Time</label>
+                  <div className="relative">
+                    <input 
+                      type="time" 
+                      value={expectedArrivalTime} 
+                      onChange={e=>setExpectedArrivalTime(e.target.value)} 
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-100 focus:outline-none transition-all cursor-pointer" 
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-gray-600 bg-blue-50 px-2.5 py-1.5 rounded">Defaults to +30 minutes from now</p>
+            </div>
+          )}
+
+          {/* Divider */}
+          <div className="h-px bg-gray-100" />
+
+          {/* Attachment Upload (Only for Leave) */}
+          {type === 'leave' && (
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-gray-700">ATTACHMENT (Optional)</label>
+              
+              {!attachmentName ? (
+                <label className="cursor-pointer block">
+                  <div className="border-2 border-dashed border-blue-300 rounded-lg p-4 sm:p-6 text-center hover:bg-blue-50 transition-colors">
+                    <div className="text-3xl mb-1">📸</div>
+                    <p className="font-semibold text-gray-800 text-sm">Upload image</p>
+                    <p className="text-xs text-gray-500">Max 800px width, JPEG</p>
+                  </div>
+                  <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                </label>
+              ) : (
+                <div className="space-y-2">
+                  <div className="border-2 border-blue-300 rounded-lg p-3 bg-blue-50">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">✅</span>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-800 truncate text-xs">{attachmentName}</p>
+                          <p className="text-xs text-gray-600">Attached</p>
+                        </div>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={() => { setAttachment(null); setAttachmentName('') }} 
+                        className="text-red-500 hover:text-red-700 font-bold text-lg flex-shrink-0"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    {attachment && (
+                      <div className="rounded-lg overflow-hidden border border-blue-200 max-h-32">
+                        <img src={attachment} alt="Preview" className="w-full h-auto object-cover" />
+                      </div>
+                    )}
+                  </div>
+                  <label className="cursor-pointer inline-block">
+                    <span className="text-xs font-semibold text-blue-600 hover:text-blue-800">Change image</span>
+                    <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Divider */}
+          <div className="h-px bg-gray-100" />
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-1">
+            <button 
+              disabled={submitting} 
+              style={{borderColor:'#C9A84C', color:'#C9A84C'}}
+              onMouseEnter={e => { e.currentTarget.style.backgroundColor='#C9A84C'; e.currentTarget.style.color='white' }}
+              onMouseLeave={e => { e.currentTarget.style.backgroundColor='transparent'; e.currentTarget.style.color='#C9A84C' }}
+              className="w-full sm:flex-1 px-4 py-2.5 rounded-lg bg-transparent font-semibold text-sm border-2 disabled:opacity-50 transition-all shadow-md hover:shadow-lg disabled:shadow-none transform hover:scale-105 active:scale-95"
+            >
+              {submitting ? 'Submitting...' : 'Submit Request'}
+            </button>
+            <button 
+              type="button" 
+              onClick={() => { setType('leave'); setReason(''); setReasonTouched(false); setStartDate(''); setEndDate(''); setExpectedArrivalTime(''); setAttachment(null); setAttachmentName('') }} 
+              className="w-full sm:flex-1 px-4 py-2.5 rounded-lg bg-red-600 text-white hover:bg-white hover:text-red-600 font-semibold text-sm transition-all shadow-sm hover:shadow-md hover:shadow-red-500/50 border-2 border-red-600 transform hover:scale-105 active:scale-95"
+            >
+              Clear Form
+            </button>
+          </div>
         </div>
       </form>
 
-      {/* Live Summary */}
-      <div className="bg-white rounded-2xl shadow mb-6">
-        <div className="p-4 border-b"><h2 className="font-semibold">Summary</h2></div>
-        <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-          <div><span className="text-gray-500">Student:</span> {auth.name} ({auth.regNumber})</div>
-          <div><span className="text-gray-500">Type:</span> {type === 'leave' ? 'Leave' : 'Late'}</div>
+      {/* Summary Section */}
+      <div className="bg-white rounded-xl shadow-sm mb-5 border border-gray-100 overflow-hidden">
+        <div className="p-3.5 sm:p-4 border-b border-gray-100">
+          <h2 className="font-bold text-sm">Request Summary</h2>
+        </div>
+        <div className="p-3.5 sm:p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-100">
+            <p className="text-xs text-gray-600 font-semibold">Student</p>
+            <p className="font-bold text-gray-900 truncate text-sm">{auth.name}</p>
+            <p className="text-xs text-gray-500">{auth.regNumber}</p>
+          </div>
+          <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-100">
+            <p className="text-xs text-gray-600 font-semibold">Type</p>
+            <p className="font-bold text-sm">{type === 'leave' ? 'Leave' : 'Late'}</p>
+          </div>
           {type === 'leave' ? (
             <>
-              <div><span className="text-gray-500">Period:</span> {startDate || '—'} → {endDate || '—'}</div>
-              <div><span className="text-gray-500">Total days:</span> {daysCount || '—'}</div>
+              <div className="p-2.5 rounded-lg bg-orange-50 border border-orange-100">
+                <p className="text-xs text-gray-600 font-semibold">Period</p>
+                <p className="font-bold text-xs text-gray-900">{startDate ? new Date(startDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) : '—'}</p>
+                <p className="text-xs text-gray-500">to {endDate ? new Date(endDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) : '—'}</p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-green-50 border border-green-100">
+                <p className="text-xs text-gray-600 font-semibold">Days</p>
+                <p className="font-bold text-lg text-green-600">{daysCount || '—'}</p>
+              </div>
             </>
           ) : (
-            <div><span className="text-gray-500">Expected arrival:</span> {expectedArrivalTime ? `Today at ${expectedArrivalTime}` : '—'}</div>
+            <>
+              <div className="p-2.5 rounded-lg bg-orange-50 border border-orange-100">
+                <p className="text-xs text-gray-600 font-semibold">Expected</p>
+                <p className="font-bold text-xs text-gray-900">{expectedArrivalTime ? `${expectedArrivalTime}` : '—'}</p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-green-50 border border-green-100">
+                <p className="text-xs text-gray-600 font-semibold">Status</p>
+                <p className="font-bold text-xs text-green-700">Pending</p>
+              </div>
+            </>
           )}
-          <div className="md:col-span-2"><span className="text-gray-500">Reason:</span> {reason || '—'}</div>
         </div>
       </div>
 
-      {/* List of Requests */}
-      <div className="bg-white rounded-2xl shadow">
-        <div className="p-4 border-b"><h2 className="font-semibold">My Requests</h2></div>
+      {/* Requests List */}
+      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div className="p-4 sm:p-5 flex items-center justify-between">
+          <h2 className="font-bold text-lg">My Requests</h2>
+          {!loading && requests.length > 0 && (
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
+              <span className="text-xs font-semibold text-blue-700">{requests.length}</span>
+            </div>
+          )}
+        </div>
+
         {loading ? (
-          <div className="p-4 text-gray-500">Loading...</div>
+          <div className="p-5 text-center">
+            <div className="inline-block px-3 py-1.5 rounded text-xs text-gray-600 font-semibold bg-gray-100">Loading...</div>
+          </div>
         ) : (
-          <ul className="divide-y">
+          <div className="divide-y">
             {(() => {
               const filteredRequests = requests.filter(r => r.type === type)
               
               if (filteredRequests.length === 0) {
                 return (
-                  <li className="p-4 text-center text-gray-500">
-                    {requests.length === 0 ? 'No requests yet.' : `No ${type} requests found.`}
-                  </li>
+                  <div className="p-6 text-center">
+                    <p className="text-gray-600 font-semibold text-sm">{requests.length === 0 ? 'No requests yet' : `No ${type} requests`}</p>
+                  </div>
                 )
               }
 
               return filteredRequests.map((r) => {
-                // Deletable statuses (must match backend)
                 const deletableStatuses = ['requested', 'waiting_for_arrival_confirmation', 'rejected_by_hod']
                 const canDelete = r.type === 'leave' && deletableStatuses.includes(r.status)
                 
+                // Status badge config
+                const statusConfig = {
+                  'requested': { bg: 'bg-yellow-50', border: 'border-yellow-200', label: 'Pending', color: 'text-yellow-700' },
+                  'waiting_for_arrival_confirmation': { bg: 'bg-blue-50', border: 'border-blue-200', label: 'En Route', color: 'text-blue-700' },
+                  'approved_by_hod': { bg: 'bg-green-50', border: 'border-green-200', label: 'Approved', color: 'text-green-700' },
+                  'rejected_by_hod': { bg: 'bg-red-50', border: 'border-red-200', label: 'Rejected', color: 'text-red-700' },
+                  'confirmed': { bg: 'bg-emerald-50', border: 'border-emerald-200', label: 'Confirmed', color: 'text-emerald-700' }
+                }
+                const status = statusConfig[r.status] || { bg: 'bg-gray-50', border: 'border-gray-200', label: r.status, color: 'text-gray-700' }
+
                 const swipeActions = r.type === 'leave' ? [
-                  // Swipe right to delete (only if deletable)
                   ...(canDelete ? [{
                     label: 'Delete',
                     icon: '🗑️',
@@ -496,7 +756,6 @@ function Leave() {
                     direction: 'right',
                     autoTrigger: true
                   }] : []),
-                  // Swipe left to download (only if approved)
                   ...(r.status === 'approved_by_hod' ? [{
                     label: 'Download',
                     icon: '📄',
@@ -515,96 +774,135 @@ function Leave() {
                 const isRecording = recordingRequest?._id === r._id
 
                 return (
-                  <li key={r._id} className="p-0 hover:bg-gray-50 transition-colors">
+                  <li key={r._id} className="hover:bg-gray-50 transition-colors p-0">
                     <SwipeableCard actions={swipeActions}>
-                      {isRecording && r.type === 'late' && r.status === 'waiting_for_arrival_confirmation' ? (
-                        // Recording state
-                        <div className="px-4 py-4 bg-gradient-to-br from-green-50 to-emerald-50 border-t-2 border-green-300">
-                          <div className="mb-3">
-                            <div className="font-semibold text-gray-900 mb-1">Late Arrival - On the way</div>
-                            <div className="text-sm text-gray-700"><strong>Reason:</strong> {r.reason}</div>
-                            <div className="text-sm text-gray-600">Expected: {formatDate(r.expectedArrivalTime)}</div>
-                          </div>
-                          <div className="bg-white rounded-lg p-2 sm:p-3 mb-3 border border-green-200 text-center">
-                            <p className="text-xs text-gray-600 mb-1">You reached at</p>
-                            <p className="text-xl sm:text-2xl md:text-3xl font-bold text-green-600 font-mono leading-tight">
-                                {arrivalTime ? new Date(arrivalTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => handleConfirmArrival(r)}
-                            disabled={confirmingArrivalId === r._id}
-                            className={`w-full px-4 py-3 font-semibold rounded-lg transition-colors ${confirmingArrivalId === r._id ? 'bg-green-300 text-white cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white'}`}
-                          >
-                            ✅ I've Reached College
-                          </button>
-                          <button
-                            onClick={() => { setRecordingRequest(null); setRecordingTime(0); setArrivalTime(null) }}
-                            className="w-full px-4 py-2 mt-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        // Default state
-                        <div className="px-4 py-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex-1 pr-4">
-                              <div className="font-medium text-gray-900 flex items-center gap-2">
-                                {r.type === 'leave' ? 'Leave' : 'Late'}
-                                {r.type === 'late' && r.status === 'waiting_for_arrival_confirmation' && (
-                                  <span className="text-xs font-bold px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">Waiting for you</span>
-                                )}
-                              </div>
-                              <div className="text-sm text-gray-600">Reason: {r.reason}</div>
-                              <div className="text-sm text-gray-600">Status: {r.status}</div>
-                              {r.type === 'leave' ? (
-                                <div className="text-sm text-gray-600">{formatDateOnly(r.startDate)} → {formatDateOnly(r.endDate)}</div>
-                              ) : (
-                                <div className="text-sm text-gray-600">Expected: {formatDate(r.expectedArrivalTime)} {r.arrivalConfirmedAt ? ` | Arrived: ${formatDate(r.arrivalConfirmedAt)}` : ''}</div>
-                              )}
+                      <div className="px-4 sm:px-5 py-3 sm:py-3.5">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                          {/* Left: Details */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${status.bg} ${status.color} border ${status.border} inline-flex items-center gap-1`}>
+                                {status.label}
+                              </span>
+                              {r.type === 'leave' && r.status === 'approved_by_hod' && <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-300">Ready to Download</span>}
+                              {r.type === 'leave' && (() => {
+                                const leaveDays = Math.ceil((new Date(r.endDate) - new Date(r.startDate)) / (1000 * 60 * 60 * 24)) + 1
+                                return leaveDays >= 5 && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Long Leave</span>
+                              })()}
+                              {r.type === 'late' && r.status === 'waiting_for_arrival_confirmation' && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 animate-pulse">Active</span>}
                             </div>
-                            {r.type === 'leave' && r.status === 'approved_by_hod' && (
-                              <a href={`/api/generate-pdf?type=leave&leaveId=${r._id}`} className="hidden sm:flex px-3 py-2 text-sm rounded-lg border text-blue-600 border-blue-600 ml-4 flex-shrink-0">Download Letter</a>
+                            
+                            <p className="text-gray-600 text-sm mb-1">{r.reason}</p>
+                            
+                            {r.type === 'leave' ? (
+                              <div className="text-xs text-gray-500 space-y-0.5">
+                                <p>{formatDateOnly(r.startDate)} to {formatDateOnly(r.endDate)}</p>
+                                {r.rejectionReason && <p className="text-red-600 font-semibold">Reason: {r.rejectionReason}</p>}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-gray-500 space-y-0.5">
+                                <p>Expected: {formatDate(r.expectedArrivalTime)}</p>
+                                {r.arrivalConfirmedAt && <p className="text-green-600 font-semibold">Arrived: {formatDate(r.arrivalConfirmedAt)}</p>}
+                              </div>
+                            )}
+
+                            {r.attachmentData && (
+                              <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200">
+                                Attachment
+                              </div>
                             )}
                           </div>
-                          {/* Mobile: Swipe instruction hint */}
-                          {r.type === 'leave' && (canDelete || r.status === 'approved_by_hod') && (
-                            <div className="sm:hidden p-2 bg-gradient-to-r from-blue-50 to-red-50 border-t border-gray-200 rounded-b text-center space-y-1">
-                              {r.status === 'approved_by_hod' && (
-                                <p className="text-xs text-gray-600 flex items-center justify-center gap-2">
-                                  <span>👈</span>
-                                  <span className="font-medium">Swipe left to download</span>
-                                </p>
-                              )}
-                              {canDelete && (
-                                <p className="text-xs text-gray-600 flex items-center justify-center gap-2">
-                                  <span>👉</span>
-                                  <span className="font-medium">Swipe right to delete</span>
-                                </p>
-                              )}
-                            </div>
-                          )}
-                          {r.type === 'late' && r.status === 'waiting_for_arrival_confirmation' && (
-                            <div className="p-3 bg-yellow-50 border-t border-yellow-100 rounded-b text-center">
+
+                          {/* Right: Actions */}
+                          <div className="flex flex-col gap-1.5">
+                            {r.type === 'leave' && r.status === 'approved_by_hod' && (
+                              <a href={`/api/generate-pdf?type=leave&leaveId=${r._id}`} className="inline-flex items-center justify-center px-3 py-2 text-xs font-bold rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white transition-all shadow-sm hover:shadow-md transform hover:scale-[1.01] active:scale-95">
+                                Download PDF
+                              </a>
+                            )}
+                            {r.type === 'late' && r.status === 'waiting_for_arrival_confirmation' && (
                               <button
-                                onClick={() => { setRecordingRequest(r); setRecordingTime(0); setArrivalTime(null) }}
-                                className="w-full px-3 py-2 text-sm rounded-lg bg-green-100 text-green-700 hover:bg-green-200"
+                                onClick={() => {
+                                  if (!isRecording) {
+                                    setRecordingRequest(r)
+                                    setRecordingTime(0)
+                                    setArrivalTime(null)
+                                  }
+                                  setIsTimerModalOpen(true)
+                                }}
+                                className="px-3 py-2 text-xs font-bold rounded-lg bg-green-100 hover:bg-green-200 text-green-700 transition-colors"
                               >
-                                ⏱ Start Timer
+                                {isRecording ? 'View' : 'Start'} Timer
                               </button>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
-                      )}
+
+                        {/* Mobile: Swipe hint */}
+                        {r.type === 'leave' && canDelete && (
+                          <div className="sm:hidden mt-2 pt-2 border-t border-gray-100">
+                            <p className="text-xs text-gray-500">Swipe right to delete</p>
+                          </div>
+                        )}
+                      </div>
                     </SwipeableCard>
                   </li>
                 )
               })
             })()}
-          </ul>
+          </div>
         )}
       </div>
+
+    {isTimerModalOpen && recordingRequest && recordingRequest.type === 'late' && recordingRequest.status === 'waiting_for_arrival_confirmation' && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 bg-black/30 backdrop-blur-sm"
+        onClick={() => setIsTimerModalOpen(false)}
+      >
+        <div className="w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="px-5 py-6 bg-white rounded-xl text-gray-900 shadow-2xl relative overflow-hidden border border-amber-100">
+            {/* Station Clock Design */}
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-theme-gold-600 via-theme-gold-400 to-theme-gold-600"></div>
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <div className="text-xs uppercase tracking-widest text-gray-500 font-bold mb-1 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-theme-gold-600 animate-pulse"></span>
+                  Live Transit Status
+                </div>
+                <div className="font-semibold text-lg">On the way to College</div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-gray-500 uppercase tracking-widest">Expected</div>
+                <div className="font-mono text-xl text-theme-gold">{formatDate(recordingRequest.expectedArrivalTime).split(', ')[1] || formatDate(recordingRequest.expectedArrivalTime)}</div>
+              </div>
+            </div>
+
+            <div className="bg-theme-gold-50 rounded-lg p-4 mb-5 border border-amber-200 flex flex-col items-center justify-center min-h-[100px]">
+              <p className="text-xs text-gray-600 uppercase tracking-widest mb-2 font-mono">Current Time (IST)</p>
+              <div className="text-4xl sm:text-5xl font-bold font-mono tracking-wider text-emerald-600" style={{ textShadow: '0 0 10px rgba(16, 185, 129, 0.2)' }}>
+                {currentTime.toLocaleTimeString('en-IN', { hour12: false })}
+              </div>
+            </div>
+
+            <button
+              onClick={() => handleConfirmArrival(recordingRequest)}
+              disabled={confirmingArrivalId === recordingRequest._id}
+              className={`w-full px-4 py-4 font-bold text-lg rounded-xl transition-all shadow-[0_0_15px_rgba(34,197,94,0.25)] ${confirmingArrivalId === recordingRequest._id ? 'bg-emerald-200 text-emerald-800 cursor-not-allowed' : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white transform hover:scale-[1.02]'}`}
+            >
+              ✅ I'VE REACHED
+            </button>
+            <div className="mt-3">
+              <button
+                onClick={() => { setRecordingRequest(null); setRecordingTime(0); setArrivalTime(null); setIsTimerModalOpen(false) }}
+                className="w-full px-4 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors"
+              >
+                Cancel Timer
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
     {confirmAction && (
       <ConfirmDialog

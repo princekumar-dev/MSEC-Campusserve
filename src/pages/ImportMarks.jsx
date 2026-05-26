@@ -35,12 +35,18 @@ function ImportMarks() {
       try {
         const data = await apiClient.post('/api/import-excel?action=upload', form)
         if (!data || !data.success) {
-          setErrors([data?.error || 'Upload failed'])
+          // Show detailed error messages if available
+          if (data?.errorMessages && data.errorMessages.length > 0) {
+            setErrors(data.errorMessages)
+          } else {
+            setErrors([data?.error || 'Upload failed'])
+          }
         } else {
           setSessionId(data.sessionId)
           setErrors(data.errorMessages || [])
         }
       } catch (err) {
+        // Extract detailed error messages from error response
         if (err.data && err.data.errorMessages && err.data.errorMessages.length > 0) {
           setErrors(err.data.errorMessages)
         } else if (err.data && err.data.error) {
@@ -63,7 +69,12 @@ function ImportMarks() {
       try {
         const data = await apiClient.post('/api/import-excel?action=confirm', { sessionId }, { timeout: 120000 })
         if (!data || !data.success) {
-          setErrors([data?.error || 'Confirm failed'])
+          // Show detailed error messages if available
+          if (data?.errorMessages && data.errorMessages.length > 0) {
+            setErrors(data.errorMessages)
+          } else {
+            setErrors([data?.error || 'Confirm failed'])
+          }
         } else {
           setResult(data)
           // Fire window events to trigger count flips in background pages immediately
@@ -71,6 +82,7 @@ function ImportMarks() {
           window.dispatchEvent(new CustomEvent('notificationsUpdated'))
         }
       } catch (err) {
+        // Extract detailed error messages from error response
         if (err.data && err.data.errorMessages && err.data.errorMessages.length > 0) {
           setErrors(err.data.errorMessages)
         } else if (err.data && err.data.error) {
@@ -142,11 +154,16 @@ function ImportMarks() {
             )}
 
             {errors && errors.length > 0 && (
-              <div className="mt-6 p-4 bg-red-50 rounded-xl text-red-800">
-                <div className="font-semibold mb-2">Issues found:</div>
-                <ul className="list-disc pl-6 space-y-1">
-                  {errors.map((e, idx) => (<li key={idx}>{e}</li>))}
+              <div className="mt-6 p-4 bg-red-50 rounded-xl text-red-800 border-2 border-red-200">
+                <div className="font-semibold mb-3 text-lg">⚠️ Issues found ({errors.length}):</div>
+                <ul className="list-disc pl-6 space-y-2">
+                  {errors.map((e, idx) => (
+                    <li key={idx} className="text-sm">
+                      <span>{e}</span>
+                    </li>
+                  ))}
                 </ul>
+                <div className="mt-3 text-xs text-red-700">Please fix these issues and try uploading again.</div>
               </div>
             )}
 

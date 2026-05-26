@@ -160,6 +160,7 @@ const LeaveRequestSchema = new mongoose.Schema({
     parentPhoneNumber: String
   },
   reason: { type: String, required: true },
+  attachmentData: { type: String }, // Base64 encoded proof image
   startDate: { type: Date },
   endDate: { type: Date },
   expectedArrivalTime: { type: Date },

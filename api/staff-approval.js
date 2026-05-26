@@ -1,7 +1,7 @@
 import { connectToDatabase } from '../lib/mongo.js'
 import { User, StaffApprovalRequest } from '../models.js'
 import bcrypt from 'bcryptjs'
-import { storeNotification, getUserSubscriptions } from '../lib/notificationService.js'
+import { storeNotification, getUserSubscriptions, markNotificationTypeAsRead } from '../lib/notificationService.js'
 import webpush from 'web-push'
 
 // Configure web-push VAPID

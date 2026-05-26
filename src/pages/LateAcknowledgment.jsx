@@ -20,7 +20,7 @@ function LateAcknowledgment() {
       const params = new URLSearchParams({
         department: auth.department,
         type: 'late',
-        status: 'requested',
+        status: 'waiting_for_arrival_confirmation',
         // Ask backend to filter by year/section too (smaller payload => faster render)
         year: auth.year,
         section: auth.section
@@ -71,7 +71,7 @@ function LateAcknowledgment() {
                 <div className="text-sm text-gray-600">Reason: {r.reason}</div>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => acknowledge(r._id)} className="px-3 py-2 text-sm rounded-lg bg-blue-600 text-white">Record Arrival</button>
+                <button onClick={() => acknowledge(r._id)} className="px-3 py-2 text-sm rounded-lg bg-theme-gold text-white hover:bg-theme-gold-500 transition-colors">Record Arrival</button>
               </div>
             </li>
           ))}
