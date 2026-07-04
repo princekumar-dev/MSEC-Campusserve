@@ -77,6 +77,22 @@ body {
 /* Mobile-specific optimizations */
 @media (max-width: 768px) {
 
+  /* Hide scrollbars on mobile while keeping scroll enabled */
+  html,
+  body,
+  * {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar,
+  *::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+
   /* Reduce complex animations on mobile */
   .glass-card {
     backdrop-filter: blur(8px) !important;
