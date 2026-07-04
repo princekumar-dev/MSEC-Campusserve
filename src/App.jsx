@@ -172,12 +172,20 @@ function AppContent() {
       } catch (e) {}
       document.body.style.backgroundImage = bgImage
       document.documentElement.style.backgroundImage = bgImage
+      document.documentElement.style.backgroundSize = 'cover'
+      document.documentElement.style.backgroundPosition = 'center'
+      document.documentElement.style.backgroundAttachment = 'fixed'
+      document.documentElement.style.backgroundRepeat = 'no-repeat'
     }
     return () => {
       document.body.classList.remove('auth-page')
       document.documentElement.classList.remove('auth-page')
       document.body.style.backgroundImage = 'none'
       document.documentElement.style.backgroundImage = 'none'
+      document.documentElement.style.backgroundSize = ''
+      document.documentElement.style.backgroundPosition = ''
+      document.documentElement.style.backgroundAttachment = ''
+      document.documentElement.style.backgroundRepeat = ''
     }
   }, [isAuthPage])
 

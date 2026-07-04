@@ -938,6 +938,18 @@ body.auth-page {
   overflow: hidden !important;
   scrollbar-width: none !important;
   overscroll-behavior: none !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-attachment: fixed !important;
+  background-repeat: no-repeat !important;
+}
+
+html.auth-page {
+  background-color: #7a8e6b !important;
+}
+
+body.auth-page {
+  background-color: #7a8e6b !important;
 }
 
 html.auth-page::-webkit-scrollbar,
