@@ -933,14 +933,15 @@ img {
 }
 
 /* Auth page: hide html/body scrollbar, let layout-container handle it */
-body.auth-page,
-body.auth-page html {
+html.auth-page,
+body.auth-page {
   overflow: hidden !important;
   scrollbar-width: none !important;
+  overscroll-behavior: none !important;
 }
 
-body.auth-page::-webkit-scrollbar,
-body.auth-page html::-webkit-scrollbar {
+html.auth-page::-webkit-scrollbar,
+body.auth-page::-webkit-scrollbar {
   display: none !important;
 }
 

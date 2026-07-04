@@ -156,8 +156,10 @@ function AppContent() {
       document.body.style.backgroundImage = 'none'
       document.documentElement.style.backgroundImage = 'none'
       document.body.classList.remove('auth-page')
+      document.documentElement.classList.remove('auth-page')
     } else {
       document.body.classList.add('auth-page')
+      document.documentElement.classList.add('auth-page')
       // Prefer AVIF/WebP via CSS image-set when supported; fallback to WebP/JPEG
       let bgImage = "url('/images/campus.jpeg')"
       try {
@@ -173,6 +175,7 @@ function AppContent() {
     }
     return () => {
       document.body.classList.remove('auth-page')
+      document.documentElement.classList.remove('auth-page')
       document.body.style.backgroundImage = 'none'
       document.documentElement.style.backgroundImage = 'none'
     }
