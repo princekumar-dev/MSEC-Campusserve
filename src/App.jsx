@@ -154,26 +154,27 @@ function AppContent() {
   useEffect(() => {
     if (!isAuthPage) {
       document.body.style.backgroundImage = 'none'
+      document.documentElement.style.backgroundImage = 'none'
       document.body.classList.remove('auth-page')
     } else {
       document.body.classList.add('auth-page')
       // Prefer AVIF/WebP via CSS image-set when supported; fallback to WebP/JPEG
+      let bgImage = "url('/images/campus.jpeg')"
       try {
         const avifImageSet = "image-set(url('/images/campus.avif') type('image/avif') 1x, url('/images/campus.webp') type('image/webp') 1x, url('/images/campus.jpeg') 1x)"
         if (typeof CSS !== 'undefined' && CSS.supports && CSS.supports('background-image', avifImageSet)) {
-          document.body.style.backgroundImage = avifImageSet
+          bgImage = avifImageSet
         } else if (typeof CSS !== 'undefined' && CSS.supports && CSS.supports('background-image', "url('/images/campus.webp')")) {
-          document.body.style.backgroundImage = "url('/images/campus.webp')"
-        } else {
-          document.body.style.backgroundImage = "url('/images/campus.jpeg')"
+          bgImage = "url('/images/campus.webp')"
         }
-      } catch (e) {
-        document.body.style.backgroundImage = "url('/images/campus.jpeg')"
-      }
+      } catch (e) {}
+      document.body.style.backgroundImage = bgImage
+      document.documentElement.style.backgroundImage = bgImage
     }
     return () => {
       document.body.classList.remove('auth-page')
       document.body.style.backgroundImage = 'none'
+      document.documentElement.style.backgroundImage = 'none'
     }
   }, [isAuthPage])
 

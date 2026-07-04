@@ -954,6 +954,7 @@ body.auth-page .layout-container {
   overflow-y: auto;
   overflow-x: hidden;
   height: 100vh;
+  overscroll-behavior: contain;
 }
 
 body.auth-page .layout-container::-webkit-scrollbar {

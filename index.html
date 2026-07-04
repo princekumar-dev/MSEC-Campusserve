@@ -44,9 +44,10 @@
   <title>MSEC Academics</title>
     <style>
       /* Apply backdrop immediately for auth pages - before React loads */
-      body {
+      html, body {
         margin: 0;
         padding: 0;
+        background-color: #1a1a2e;
         /* Fallback for older browsers */
         background-image: url('/images/campus.jpeg');
         background-size: cover;
@@ -57,7 +58,7 @@
 
       /* Use image-set when supported to prefer AVIF/WebP implicitly */
       @supports (background-image: image-set(url('/images/campus.avif') type('image/avif') 1x)) {
-        body {
+        html, body {
           background-image: image-set(
             url('/images/campus.avif') type('image/avif') 1x,
             url('/images/campus.webp') type('image/webp') 1x,
