@@ -43,28 +43,9 @@
 
   <title>MSEC Academics</title>
     <style>
-      /* Apply backdrop immediately for auth pages - before React loads */
-      html, body {
+      body {
         margin: 0;
         padding: 0;
-        background-color: #8a9bb0;
-        /* Fallback for older browsers */
-        background-image: url('/images/campus.jpeg');
-        background-size: cover;
-        background-position: center;
-        background-attachment: fixed;
-        background-repeat: no-repeat;
-      }
-
-      /* Use image-set when supported to prefer AVIF/WebP implicitly */
-      @supports (background-image: image-set(url('/images/campus.avif') type('image/avif') 1x)) {
-        html, body {
-          background-image: image-set(
-            url('/images/campus.avif') type('image/avif') 1x,
-            url('/images/campus.webp') type('image/webp') 1x,
-            url('/images/campus.jpeg') 1x
-          );
-        }
       }
       
       .wave-text {
