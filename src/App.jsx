@@ -154,7 +154,9 @@ function AppContent() {
   useEffect(() => {
     if (!isAuthPage) {
       document.body.style.backgroundImage = 'none'
+      document.body.classList.remove('auth-page')
     } else {
+      document.body.classList.add('auth-page')
       // Prefer AVIF/WebP via CSS image-set when supported; fallback to WebP/JPEG
       try {
         const avifImageSet = "image-set(url('/images/campus.avif') type('image/avif') 1x, url('/images/campus.webp') type('image/webp') 1x, url('/images/campus.jpeg') 1x)"
@@ -168,6 +170,10 @@ function AppContent() {
       } catch (e) {
         document.body.style.backgroundImage = "url('/images/campus.jpeg')"
       }
+    }
+    return () => {
+      document.body.classList.remove('auth-page')
+      document.body.style.backgroundImage = 'none'
     }
   }, [isAuthPage])
 
@@ -184,7 +190,7 @@ function AppContent() {
     <>
       <GlobalExecutionLoader />
       <div
-        className={`flex w-full flex-col ${isAuthPage ? 'relative' : ''}`}
+        className={`flex w-full flex-col ${isAuthPage ? 'relative auth-wrapper' : ''}`}
         style={{
           fontFamily: 'Inter, Manrope, sans-serif',
           WebkitOverflowScrolling: 'touch',

@@ -908,6 +908,76 @@ img {
   max-width: 100%;
 }
 
+/* Global custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d39a33;
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #b67f26;
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d39a33 #f8fafc;
+}
+
+/* Auth page: hide html/body scrollbar, let layout-container handle it */
+body.auth-page,
+body.auth-page html {
+  overflow: hidden !important;
+  scrollbar-width: none !important;
+}
+
+body.auth-page::-webkit-scrollbar,
+body.auth-page html::-webkit-scrollbar {
+  display: none !important;
+}
+
+/* Auth page: disable scroll on the outer wrapper, let layout-container handle it */
+body.auth-page .auth-wrapper {
+  overflow: hidden !important;
+}
+
+/* Auth page layout-container: transparent track, white thumb */
+body.auth-page .layout-container {
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100vh;
+}
+
+body.auth-page .layout-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+body.auth-page .layout-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+body.auth-page .layout-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 2px;
+}
+
+body.auth-page .layout-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+body.auth-page .layout-container {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.6) transparent;
+}
+
 /* Custom scrollbar styling for settings */
 .settings-content::-webkit-scrollbar {
   width: 6px;
