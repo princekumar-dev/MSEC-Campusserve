@@ -1,6 +1,57 @@
 import { connectToDatabase } from './lib/mongo.js'
-import { User } from './models.js'
+import { User, Student, Marksheet, ImportSession, LeaveRequest, StaffApprovalRequest, AccessPolicy, ServiceRequest, Notification, WhatsappInstance } from './models.js'
 import bcrypt from 'bcryptjs'
+
+const campusUsers = [
+  {
+    name: 'Campus Admin',
+    email: 'admin@msec.edu.in',
+    password: '123',
+    role: 'admin',
+    department: 'ADMIN',
+    phoneNumber: '+91-9876543201'
+  },
+  {
+    name: 'Service Manager John',
+    email: 'manager@msec.edu.in',
+    password: '123',
+    role: 'manager',
+    department: 'MAINTENANCE',
+    phoneNumber: '+91-9876543202'
+  },
+  {
+    name: 'Technician Dave',
+    email: 'tech@msec.edu.in',
+    password: '123',
+    role: 'technician',
+    department: 'ELECTRICAL',
+    phoneNumber: '+91-9876543203'
+  },
+  {
+    name: 'Accounts Officer Sarah',
+    email: 'accounts@msec.edu.in',
+    password: '123',
+    role: 'accounts',
+    department: 'ACCOUNTS',
+    phoneNumber: '+91-9876543204'
+  },
+  {
+    name: 'Dr. Helen (Faculty Requester)',
+    email: 'faculty@msec.edu.in',
+    password: '123',
+    role: 'requester',
+    department: 'CSE',
+    phoneNumber: '+91-9876543205'
+  },
+  {
+    name: 'Super Admin',
+    email: 'super@msec.edu.in',
+    password: '123',
+    role: 'super_admin',
+    department: 'SYSTEM',
+    phoneNumber: '+91-9876543200'
+  }
+]
 
 const academicUsers = [
   // HODs for each department
@@ -151,8 +202,7 @@ const academicUsers = [
     department: 'EEE',
     class: 'B',
     phoneNumber: '+91-9876543224'
-  }
-  ,
+  },
   {
     name: 'Prof. Maya Krishnan',
     email: 'maya.krishnan@msec.edu.in',
@@ -173,36 +223,45 @@ const academicUsers = [
   }
 ]
 
-async function seedAcademicUsers() {
+async function seedAllUsers() {
   try {
     console.log('🔄 Connecting to database...')
     await connectToDatabase()
     
-    console.log('🧹 Clearing existing academic users...')
-    // Clear only hod and staff roles in the database
-    await User.deleteMany({ role: { $in: ['hod', 'staff'] } })
+    console.log('🧹 Clearing all existing users and all other collections...')
+    await User.deleteMany({})
+    await ServiceRequest.deleteMany({})
+    await Student.deleteMany({})
+    await Marksheet.deleteMany({})
+    await ImportSession.deleteMany({})
+    await LeaveRequest.deleteMany({})
+    await StaffApprovalRequest.deleteMany({})
+    await AccessPolicy.deleteMany({})
+    await Notification.deleteMany({})
+    await WhatsappInstance.deleteMany({})
     
-    console.log('🌱 Seeding academic users...')
+    const allUsers = [...campusUsers, ...academicUsers]
+    console.log(`🌱 Seeding ${allUsers.length} total demo users (Campus + Academic)...`)
     
-    for (const userData of academicUsers) {
+    for (const userData of allUsers) {
       const hashedPassword = await bcrypt.hash(userData.password, 10)
       const user = new User({
         ...userData,
         password: hashedPassword
       })
       await user.save()
-      console.log(`✅ Created ${userData.role}: ${userData.name} (${userData.department}${userData.class ? ' - Class ' + userData.class : ''})`)
+      console.log(`✅ Created [${userData.role.toUpperCase()}] ${userData.name} (${userData.email})`)
     }
     
-    console.log('\n🎉 Successfully seeded academic users!')
-    console.log('\n📧 Login Credentials:')
-    console.log('HODs:')
-    academicUsers.filter(u => u.role === 'hod').forEach(user => {
-      console.log(`  ${user.department} HOD: ${user.email} / ${user.password}`)
+    console.log('\n🎉 Successfully seeded all demo users with password: 123!')
+    console.log('\n📧 CampusServe Credentials:')
+    campusUsers.forEach(user => {
+      console.log(`  Role: [${user.role.toUpperCase()}] Email: ${user.email}`)
     })
-    console.log('\nStaff:')
-    academicUsers.filter(u => u.role === 'staff').forEach(user => {
-      console.log(`  ${user.department} Class ${user.class}: ${user.email} / ${user.password}`)
+    
+    console.log('\n📧 Academic Credentials:')
+    academicUsers.forEach(user => {
+      console.log(`  Role: [${user.role.toUpperCase()}] Email: ${user.email} (${user.department}${user.class ? ' - Class ' + user.class : ''})`)
     })
     
     process.exit(0)
@@ -212,4 +271,4 @@ async function seedAcademicUsers() {
   }
 }
 
-seedAcademicUsers()
+seedAllUsers()

@@ -2,15 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAlert } from '../components/AlertContext'
 import apiClient from '../utils/apiClient'
-import { User, Key, ArrowRight } from 'lucide-react'
-
-const demoCredentials = [
-  { role: 'Requester', email: 'faculty@campuserve.com', desc: 'Raise requests' },
-  { role: 'Admin', email: 'admin@campuserve.com', desc: 'Approve & assign' },
-  { role: 'Manager', email: 'manager@campuserve.com', desc: 'Estimate & invoice' },
-  { role: 'Technician', email: 'tech@campuserve.com', desc: 'Update & log work' },
-  { role: 'Accounts', email: 'accounts@campuserve.com', desc: 'Record payments' }
-]
+import { Lock } from 'lucide-react'
 
 function Login() {
   const [email, setEmail] = useState('')
@@ -58,110 +50,37 @@ function Login() {
     }
   }
 
-  const fillCredentials = (demoEmail) => {
-    setEmail(demoEmail)
-    setPassword('campus123')
-  }
-
   return (
-    <div className="flex-1 flex flex-col items-center justify-center min-h-[75vh] px-4 py-8 relative">
-      
-      {/* Visual background lights */}
-      <div className="absolute top-1/4 left-1/4 h-72 w-72 bg-violet-600/10 rounded-full blur-[100px] pointer-events-none"></div>
-      <div className="absolute bottom-1/4 right-1/4 h-72 w-72 bg-indigo-600/10 rounded-full blur-[100px] pointer-events-none"></div>
-
-      <div className="w-full max-w-md glass-card-purple p-8 rounded-2xl relative z-10 border border-violet-500/20">
-        
-        {/* Brand */}
-        <div className="text-center mb-8">
-          <h2 className="font-display font-extrabold text-3xl tracking-tight text-white">
-            Welcome to <span className="wave-text">CampusServe</span>
-          </h2>
-          <p className="text-sm text-slate-400 mt-2">
-            Log in to manage campus service and maintenance operations
-          </p>
-        </div>
-
-        {/* Login Form */}
-        <form onSubmit={handleLogin} className="space-y-5">
-          <div>
-            <label className="block text-xs font-semibold text-violet-300 uppercase tracking-wider mb-2">
-              Email Address
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-violet-400/70">
-                <User size={16} />
-              </span>
-              <input
-                type="email"
-                placeholder="you@campuserve.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-950/60 border border-violet-950/60 focus:border-violet-500 rounded-xl py-3 pl-11 pr-4 text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all"
-              />
+    <div className="flex min-h-screen items-center justify-center px-3 py-6 sm:px-4 sm:py-8">
+      <div className="relative z-10 mx-auto w-full max-w-md">
+        <div className="rounded-2xl border border-white/30 bg-white/20 p-5 shadow-2xl backdrop-blur-md sm:rounded-3xl sm:p-8">
+          <div className="mb-6 text-center sm:mb-8">
+            <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-violet-100 sm:mb-6 sm:h-16 sm:w-16">
+              <Lock className="h-7 w-7 text-violet-600 sm:h-8 sm:w-8" />
             </div>
+            <h1 className="mb-1.5 text-2xl font-black text-white sm:mb-2 sm:text-4xl">Welcome Back</h1>
+            <p className="text-sm text-gray-100 sm:text-lg">Sign in to your MSEC CampusServe account</p>
           </div>
 
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="block text-xs font-semibold text-violet-300 uppercase tracking-wider">
-                Password
-              </label>
+          <form onSubmit={handleLogin} className="space-y-5 sm:space-y-6">
+            <div>
+              <label className="mb-3 block text-sm font-bold text-white">Email Address</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" placeholder="Enter your email address" className="w-full rounded-xl border border-white/30 bg-white/20 px-4 py-3 text-white outline-none backdrop-blur-sm transition-all duration-200 placeholder:text-gray-200 focus:ring-2 focus:ring-violet-300 sm:rounded-2xl sm:py-4" required />
             </div>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-violet-400/70">
-                <Key size={16} />
-              </span>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-950/60 border border-violet-950/60 focus:border-violet-500 rounded-xl py-3 pl-11 pr-4 text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all"
-              />
+            <div>
+              <label className="mb-3 block text-sm font-bold text-white">Password</label>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" placeholder="Enter your password" className="w-full rounded-xl border border-white/30 bg-white/20 px-4 py-3 text-white outline-none backdrop-blur-sm transition-all duration-200 placeholder:text-gray-200 focus:ring-2 focus:ring-violet-300 sm:rounded-2xl sm:py-4" required />
             </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full purple-glow-btn py-3 font-semibold text-sm flex items-center justify-center space-x-2 text-white transition-all disabled:opacity-50"
-          >
-            {isLoading ? (
-              <div className="h-5 w-5 border-t-2 border-r-2 border-white rounded-full animate-spin"></div>
-            ) : (
-              <>
-                <span>Secure Log In</span>
-                <ArrowRight size={16} />
-              </>
-            )}
-          </button>
-        </form>
-
-        {/* Credentials Autocomplete Widget */}
-        <div className="mt-8 pt-6 border-t border-violet-950/40">
-          <span className="block text-xs font-bold text-violet-400 tracking-wider uppercase mb-3">
-            Quick Testing Accounts
-          </span>
-          <div className="grid grid-cols-2 gap-2">
-            {demoCredentials.map((cred) => (
-              <button
-                key={cred.role}
-                onClick={() => fillCredentials(cred.email)}
-                className="text-left p-2.5 rounded-lg bg-slate-950/40 hover:bg-violet-950/30 border border-violet-950/40 hover:border-violet-900/50 transition-all group"
-              >
-                <div className="text-xs font-bold text-violet-300 group-hover:text-violet-200">{cred.role}</div>
-                <div className="text-[10px] text-slate-500 overflow-hidden text-ellipsis whitespace-nowrap">{cred.email}</div>
+            <div className="pt-4">
+              <button type="submit" disabled={isLoading} className="glass-button w-full rounded-xl px-6 py-3.5 text-base font-bold text-violet-600 transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-50 sm:rounded-2xl sm:py-4 sm:text-lg">
+                {isLoading ? 'Signing in...' : 'Sign In'}
               </button>
-            ))}
-          </div>
-        </div>
+            </div>
+          </form>
 
-        <div className="mt-6 text-center text-xs text-slate-500">
-          Need an account?{' '}
-          <Link to="/signup" className="text-violet-400 hover:text-violet-300 font-semibold underline transition-all">
-            Sign Up
-          </Link>
+          <div className="mt-8 text-center">
+            <p className="text-sm text-gray-100">Don't have an account? <Link to="/signup" className="ml-1 font-semibold text-violet-300 hover:underline">Sign up</Link></p>
+          </div>
         </div>
       </div>
     </div>

@@ -70,6 +70,43 @@ function AppContent() {
   }, [location.pathname])
 
   useEffect(() => {
+    if (!isAuthPage) return
+    const authScroller = document.querySelector('body.auth-page .layout-container')
+    if (authScroller) authScroller.scrollTop = 0
+  }, [isAuthPage, location.pathname])
+
+  useEffect(() => {
+    const handleWheel = (event) => {
+      if (!event.deltaY || event.ctrlKey) return
+
+      // Leave independently scrollable panels, tables and modals alone.
+      let node = event.target instanceof Element ? event.target : null
+      while (node && node !== document.body) {
+        const style = window.getComputedStyle(node)
+        const canScroll = /(auto|scroll)/.test(style.overflowY) && node.scrollHeight > node.clientHeight
+        if (canScroll) return
+        node = node.parentElement
+      }
+
+      const before = window.scrollY
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight
+      const hasRoom = event.deltaY > 0 ? before < maxScroll : before > 0
+      if (!hasRoom) return
+
+      // Edge/trackpad fallback: intervene only if the browser did not perform
+      // the native window scroll by the next animation frame.
+      requestAnimationFrame(() => {
+        if (Math.abs(window.scrollY - before) < 1) {
+          window.scrollBy({ top: event.deltaY, left: 0, behavior: 'auto' })
+        }
+      })
+    }
+
+    window.addEventListener('wheel', handleWheel, { passive: true, capture: true })
+    return () => window.removeEventListener('wheel', handleWheel, { capture: true })
+  }, [])
+
+  useEffect(() => {
     if (!isAuthPage) {
       document.body.style.backgroundImage = 'none'
       document.documentElement.style.backgroundImage = 'none'
@@ -78,19 +115,28 @@ function AppContent() {
     } else {
       document.body.classList.add('auth-page')
       document.documentElement.classList.add('auth-page')
-      
-      // Purple gradient styled auth page
-      document.body.style.background = 'radial-gradient(circle at top left, #120e2e, #070716, #220735)'
-      document.documentElement.style.background = 'radial-gradient(circle at top left, #120e2e, #070716, #220735)'
+      document.body.style.background = ''
+      document.documentElement.style.background = ''
+
+      let backgroundImage = "url('/images/campus.jpeg')"
+      const imageSet = "image-set(url('/images/campus.avif') type('image/avif') 1x, url('/images/campus.webp') type('image/webp') 1x, url('/images/campus.jpeg') 1x)"
+      if (typeof CSS !== 'undefined' && CSS.supports?.('background-image', imageSet)) backgroundImage = imageSet
+      document.body.style.backgroundImage = backgroundImage
+      document.documentElement.style.backgroundImage = backgroundImage
       document.documentElement.style.backgroundSize = 'cover'
       document.documentElement.style.backgroundPosition = 'center'
       document.documentElement.style.backgroundAttachment = 'fixed'
+      document.documentElement.style.backgroundRepeat = 'no-repeat'
     }
     return () => {
       document.body.classList.remove('auth-page')
       document.documentElement.classList.remove('auth-page')
       document.body.style.backgroundImage = 'none'
       document.documentElement.style.backgroundImage = 'none'
+      document.documentElement.style.backgroundSize = ''
+      document.documentElement.style.backgroundPosition = ''
+      document.documentElement.style.backgroundAttachment = ''
+      document.documentElement.style.backgroundRepeat = ''
     }
   }, [isAuthPage])
 
@@ -103,6 +149,7 @@ function AppContent() {
           minHeight: '100vh'
         }}
       >
+        {isAuthPage && <div className="pointer-events-none fixed inset-0 z-0 bg-black/40" />}
         <div className={`layout-container flex min-h-screen flex-col max-w-full ${isAuthPage ? 'relative z-10' : 'bg-[#FAF7F0] text-slate-800'}`}>
           <Header />
           <main className="flex w-full flex-1 justify-center">

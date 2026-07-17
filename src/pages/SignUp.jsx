@@ -10,8 +10,8 @@ function SignUp() {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'requester',
-    department: 'CSE',
+    role: '',
+    department: '',
     phoneNumber: ''
   })
   const [isLoading, setIsLoading] = useState(false)
@@ -70,25 +70,21 @@ function SignUp() {
   }
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center min-h-[75vh] px-4 py-8 relative">
-      <div className="absolute top-1/4 left-1/4 h-72 w-72 bg-violet-600/10 rounded-full blur-[100px] pointer-events-none"></div>
-      <div className="absolute bottom-1/4 right-1/4 h-72 w-72 bg-indigo-600/10 rounded-full blur-[100px] pointer-events-none"></div>
-
-      <div className="w-full max-w-lg glass-card-purple p-8 rounded-2xl relative z-10 border border-violet-500/20">
+    <div className="flex min-h-screen items-center justify-center px-4 py-8 smooth-scroll mobile-smoothest-scroll no-mobile-anim">
+      <div className="auth-academics-card relative z-10 w-full max-w-md rounded-3xl border border-white/30 bg-white/20 p-6 shadow-2xl backdrop-blur-md">
         <div className="text-center mb-8">
-          <h2 className="font-display font-extrabold text-3xl tracking-tight text-white">
-            Create <span className="wave-text">CampusServe</span> Account
-          </h2>
-          <p className="text-sm text-slate-400 mt-2">
-            Sign up to access and execute maintenance operations
-          </p>
+          <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full bg-violet-100">
+            <Lock className="h-8 w-8 text-violet-600" />
+          </div>
+          <h1 className="mb-2 text-3xl font-black text-white sm:text-4xl">Create Account</h1>
+          <p className="whitespace-nowrap text-sm text-gray-100">Sign up for your MSEC CampusServe account</p>
         </div>
 
         <form onSubmit={handleSignUp} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-violet-300 uppercase tracking-wider mb-2">
-                Full Name *
+                Full Name
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-violet-400/70">
@@ -97,7 +93,7 @@ function SignUp() {
                 <input
                   type="text"
                   name="name"
-                  placeholder="John Doe"
+                  placeholder="Enter your name"
                   value={formData.name}
                   onChange={handleInputChange}
                   className="w-full bg-slate-950/60 border border-violet-950/60 focus:border-violet-500 rounded-xl py-3 pl-11 pr-4 text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all"
@@ -108,7 +104,7 @@ function SignUp() {
 
             <div>
               <label className="block text-xs font-semibold text-violet-300 uppercase tracking-wider mb-2">
-                Email Address *
+                Email Address
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-violet-400/70">
@@ -117,20 +113,21 @@ function SignUp() {
                 <input
                   type="email"
                   name="email"
-                  placeholder="john.doe@college.edu"
+                  placeholder="Enter your email"
                   value={formData.email}
                   onChange={handleInputChange}
                   className="w-full bg-slate-950/60 border border-violet-950/60 focus:border-violet-500 rounded-xl py-3 pl-11 pr-4 text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all"
                   required
                 />
               </div>
+              <p className="mt-2 text-xs text-gray-100">Use your official MSEC email address</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-violet-300 uppercase tracking-wider mb-2">
-                User Role *
+                Role
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-violet-400/70">
@@ -142,6 +139,7 @@ function SignUp() {
                   onChange={handleInputChange}
                   className="w-full bg-slate-950/60 border border-violet-950/60 focus:border-violet-500 rounded-xl py-3 pl-11 pr-4 text-slate-300 text-sm focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all appearance-none"
                 >
+                  <option className="bg-gray-800 text-white" value="">Select Role</option>
                   <option className="bg-slate-950 text-slate-300" value="requester">Requester (Faculty/Staff)</option>
                   <option className="bg-slate-950 text-slate-300" value="manager">Service Manager</option>
                   <option className="bg-slate-950 text-slate-300" value="technician">Technician</option>
@@ -153,7 +151,7 @@ function SignUp() {
 
             <div>
               <label className="block text-xs font-semibold text-violet-300 uppercase tracking-wider mb-2">
-                Department *
+                Department
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-violet-400/70">
@@ -165,6 +163,7 @@ function SignUp() {
                   onChange={handleInputChange}
                   className="w-full bg-slate-950/60 border border-violet-950/60 focus:border-violet-500 rounded-xl py-3 pl-11 pr-4 text-slate-300 text-sm focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all appearance-none"
                 >
+                  <option className="bg-gray-800 text-white" value="">Select Department</option>
                   <option className="bg-slate-950 text-slate-300" value="CSE">CSE</option>
                   <option className="bg-slate-950 text-slate-300" value="ECE">ECE</option>
                   <option className="bg-slate-950 text-slate-300" value="MECH">MECH</option>
@@ -188,7 +187,7 @@ function SignUp() {
               <input
                 type="tel"
                 name="phoneNumber"
-                placeholder="+91-XXXXXXXXXX"
+                placeholder="Enter your number"
                 value={formData.phoneNumber}
                 onChange={handleInputChange}
                 className="w-full bg-slate-950/60 border border-violet-950/60 focus:border-violet-500 rounded-xl py-3 pl-11 pr-4 text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all"
@@ -199,7 +198,7 @@ function SignUp() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-violet-300 uppercase tracking-wider mb-2">
-                Password *
+                Password
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-violet-400/70">
@@ -208,7 +207,7 @@ function SignUp() {
                 <input
                   type="password"
                   name="password"
-                  placeholder="••••••••"
+                  placeholder="Create a password"
                   value={formData.password}
                   onChange={handleInputChange}
                   className="w-full bg-slate-950/60 border border-violet-950/60 focus:border-violet-500 rounded-xl py-3 pl-11 pr-4 text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all"
@@ -219,7 +218,7 @@ function SignUp() {
 
             <div>
               <label className="block text-xs font-semibold text-violet-300 uppercase tracking-wider mb-2">
-                Confirm Password *
+                Confirm Password
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-violet-400/70">
@@ -228,7 +227,7 @@ function SignUp() {
                 <input
                   type="password"
                   name="confirmPassword"
-                  placeholder="••••••••"
+                  placeholder="Repeat password"
                   value={formData.confirmPassword}
                   onChange={handleInputChange}
                   className="w-full bg-slate-950/60 border border-violet-950/60 focus:border-violet-500 rounded-xl py-3 pl-11 pr-4 text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all"
@@ -241,7 +240,7 @@ function SignUp() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full purple-glow-btn py-3 mt-2 font-semibold text-sm flex items-center justify-center space-x-2 text-white transition-all disabled:opacity-50"
+            className="glass-button mt-2 flex w-full items-center justify-center rounded-2xl px-6 py-4 text-lg font-bold text-violet-600 transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isLoading ? (
               <div className="h-5 w-5 border-t-2 border-r-2 border-white rounded-full animate-spin"></div>
@@ -251,10 +250,10 @@ function SignUp() {
           </button>
         </form>
 
-        <div className="mt-6 text-center text-xs text-slate-500">
+        <div className="mt-8 text-center text-sm text-gray-100">
           Already have an account?{' '}
-          <Link to="/login" className="text-violet-400 hover:text-violet-300 font-semibold underline transition-all">
-            Log In
+          <Link to="/login" className="ml-1 font-semibold text-violet-300 hover:underline">
+            Sign in
           </Link>
         </div>
       </div>

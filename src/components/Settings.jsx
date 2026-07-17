@@ -527,7 +527,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
   const handleEmailSupport = (e) => {
     e.stopPropagation()
     e.preventDefault()
-    window.location.href = "mailto:support@msecacademics.edu?subject=MSEC Academics Support"
+    window.location.href = "mailto:support@campuserve.com?subject=MSEC CampusServe Support"
     setTimeout(() => { onClose() }, 300)
   }
 
@@ -580,7 +580,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
           </button>
           <div className="flex items-center gap-3 pr-2">
             <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center flex-shrink-0 group-hover:shadow-md group-hover:scale-105 transition-all duration-200">
-              <span className="text-base font-bold text-yellow-600 group-hover:text-yellow-700 transition-colors duration-200">
+              <span className="text-base font-bold text-violet-600 group-hover:text-violet-700 transition-colors duration-200">
                 {displayInitial}
               </span>
             </div>
@@ -600,7 +600,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
       {userRole !== 'student' && (
         <div>
           <h4 className="text-sm font-semibold text-[#111418] group-hover:text-[#0b1220] mb-2 flex items-center gap-2 transition-colors duration-200">
-            <svg className="w-4 h-4 group-hover:text-yellow-600 transition-colors duration-200" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="w-4 h-4 group-hover:text-violet-600 transition-colors duration-200" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
             </svg>
             Account
@@ -656,7 +656,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
       {userRole === 'student' && (
         <div>
           <h4 className="text-sm font-semibold text-[#111418] group-hover:text-[#0b1220] mb-2 flex items-center gap-2 transition-colors duration-200">
-            <svg className="w-4 h-4 group-hover:text-yellow-600 transition-colors duration-200" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="w-4 h-4 group-hover:text-violet-600 transition-colors duration-200" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
             </svg>
             Account
@@ -692,7 +692,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
       {/* Notifications Section */}
       <div className="border-t border-[#e7edf4] pt-3">
         <h4 className="text-sm font-semibold text-[#111418] group-hover:text-[#0b1220] mb-2 flex items-center gap-2 transition-colors duration-200">
-          <svg className="w-4 h-4 group-hover:text-yellow-600 transition-colors duration-200" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="w-4 h-4 group-hover:text-violet-600 transition-colors duration-200" fill="currentColor" viewBox="0 0 20 20">
             <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
           </svg>
           Notifications
@@ -720,7 +720,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
           <div className="flex items-center justify-between p-3 rounded-lg bg-white/6 min-h-[52px]">
             <div className="flex-1">
               <p className="text-sm font-medium text-[#111418]">Push Notifications</p>
-              <p className="text-xs text-[#60758a]">Get academic notifications</p>
+              <p className="text-xs text-[#60758a]">Get CampusServe request notifications</p>
             </div>
             <div className="flex-shrink-0 toggle-touch-area">
               <button
@@ -738,7 +738,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
               >
                 {notificationLoading ? (
                   <div className="toggle-knob">
-                    <svg className="animate-spin h-3 w-3 text-theme-gold-600 mx-auto" fill="none" viewBox="0 0 24 24">
+                    <svg className="animate-spin h-3 w-3 text-violet-600 mx-auto" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
@@ -753,7 +753,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
           <div className="flex items-center justify-between p-3 rounded-lg bg-white/6 min-h-[52px]">
             <div className="flex-1">
               <p className="text-sm font-medium text-[#111418]">Email Notifications</p>
-              <p className="text-xs text-[#60758a]">Receive academic updates via email</p>
+              <p className="text-xs text-[#60758a]">Receive CampusServe updates via email</p>
             </div>
             <div className="flex-shrink-0 toggle-touch-area">
               <button
@@ -776,7 +776,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
       {/* Help Section */}
       <div className="border-t border-[#e7edf4] pt-3">
         <h4 className="text-sm font-semibold text-[#111418] group-hover:text-[#0b1220] mb-2 flex items-center gap-2 transition-colors duration-200">
-          <svg className="w-4 h-4 group-hover:text-yellow-600 transition-colors duration-200" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="w-4 h-4 group-hover:text-violet-600 transition-colors duration-200" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
           </svg>
           Help & Support
@@ -848,7 +848,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="Enter current password"
-                  className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-500 focus:outline-none text-base"
+                  className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-400 focus:border-violet-500 focus:outline-none text-base"
                   autoComplete="current-password"
                 />
               </div>
@@ -860,7 +860,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Enter new password (min. 6 characters)"
-                  className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-500 focus:outline-none text-base"
+                  className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-400 focus:border-violet-500 focus:outline-none text-base"
                   autoComplete="new-password"
                 />
               </div>
@@ -872,7 +872,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Confirm new password"
-                  className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-500 focus:outline-none text-base"
+                  className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-400 focus:border-violet-500 focus:outline-none text-base"
                   autoComplete="new-password"
                 />
               </div>
@@ -888,7 +888,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
               <button
                 onClick={handlePasswordReset}
                 disabled={passwordLoading}
-                className="flex-1 px-4 py-2.5 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-60 font-semibold text-sm transition-colors"
+                className="flex-1 px-4 py-2.5 bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-60 font-semibold text-sm transition-colors"
               >
                 {passwordLoading ? 'Resetting...' : 'Reset Password'}
               </button>
@@ -970,7 +970,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
                 ) : (
                   <label
                     htmlFor="signature-upload"
-                    className="flex flex-col items-center justify-center border-3 border-dashed border-gray-300 rounded-xl p-8 cursor-pointer hover:border-yellow-500 hover:bg-yellow-50 transition-all"
+                    className="flex flex-col items-center justify-center border-3 border-dashed border-gray-300 rounded-xl p-8 cursor-pointer hover:border-violet-500 hover:bg-violet-50 transition-all"
                     style={{ height: '200px' }}
                   >
                     <svg className="w-12 h-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -998,7 +998,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
               </button>
               <button
                 onClick={saveSignature}
-                className="flex-1 px-4 py-2.5 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 font-semibold text-sm transition-colors shadow-md"
+                className="flex-1 px-4 py-2.5 bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-semibold text-sm transition-colors shadow-md"
               >
                 Save
               </button>

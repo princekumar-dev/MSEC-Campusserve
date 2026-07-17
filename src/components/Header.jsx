@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { Bell, ChevronDown, ClipboardList, LogOut, Menu, PlusCircle, Search, X } from 'lucide-react'
 import { getAuthOrNull } from '../utils/auth'
+import Settings from './Settings'
 
 function Header() {
   const location = useLocation()
@@ -11,6 +12,7 @@ function Header() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showDropdown, setShowDropdown] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const dropdownRef = useRef(null)
 
   useEffect(() => {
@@ -34,6 +36,7 @@ function Header() {
   useEffect(() => {
     setIsMobileMenuOpen(false)
     setShowDropdown(false)
+    setIsSettingsOpen(false)
   }, [location.pathname])
 
   const handleLogout = () => {
@@ -64,17 +67,6 @@ function Header() {
     </>
   )
 
-  if (isAuthPage) {
-    return (
-      <header className="relative z-10 flex w-full items-center justify-center px-4 py-6">
-        <Link to="/" className="flex items-center gap-3 rounded-2xl border border-violet-200/50 bg-white/80 px-5 py-3 shadow-lg shadow-violet-950/5 backdrop-blur-xl">
-          <img src="/images/mseclogo.png" alt="MSEC Logo" className="h-10 w-10 object-contain" />
-          <span className="text-xl font-bold tracking-tight text-slate-900">MSEC <span className="font-black text-violet-600">CampusServe</span></span>
-        </Link>
-      </header>
-    )
-  }
-
   return (
     <header
       className="glass-card campusserve-header sticky top-0 z-50 mx-2 mt-2 flex items-center justify-between whitespace-nowrap px-3 py-3 sm:mx-3 sm:mt-3 sm:px-4 sm:py-4 md:mx-4 md:mt-4 md:px-6 lg:px-8 xl:px-10"
@@ -93,7 +85,7 @@ function Header() {
           <nav className="hidden min-w-0 flex-shrink items-center gap-4 lg:flex xl:gap-5 2xl:gap-6">{navigation}</nav>
       </div>
 
-      <div className="hidden flex-shrink-0 items-center gap-2 lg:flex lg:gap-3 xl:gap-4">
+      <div className={`${isAuthPage ? 'hidden' : 'hidden lg:flex'} flex-shrink-0 items-center gap-2 lg:gap-3 xl:gap-4`}>
           {user ? (
             <>
               <form onSubmit={handleSearchSubmit} className="relative !h-9 w-40 lg:!h-10 lg:w-48 xl:w-64">
@@ -111,23 +103,13 @@ function Header() {
                   <Bell className="h-5 w-5 text-[#60758a] transition-colors hover:text-violet-600" />
                   <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border border-white bg-violet-600" />
                 </button>
-                <button onClick={() => setShowDropdown((value) => !value)} className="group flex h-9 items-center gap-2 rounded-lg px-2 transition-colors hover:bg-[#f0f2f5] lg:h-10 lg:px-3">
+                <button onClick={() => setIsSettingsOpen((value) => !value)} className="group flex h-9 items-center gap-2 rounded-lg px-2 transition-colors hover:bg-[#f0f2f5] lg:h-10 lg:px-3" title="Settings">
                   <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-700 text-xs font-bold text-white lg:h-8 lg:w-8 lg:text-sm">
                     {(user.name || user.email || 'U').charAt(0).toUpperCase()}
                   </span>
                   <span className="hidden max-w-[120px] truncate text-xs font-medium text-[#111418] group-hover:text-violet-600 xl:inline lg:max-w-[150px]">{user.email}</span>
-                  <ChevronDown className={`h-3 w-3 text-[#60758a] transition-transform lg:h-4 lg:w-4 ${showDropdown ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`h-3 w-3 text-[#60758a] transition-transform lg:h-4 lg:w-4 ${isSettingsOpen ? 'rotate-180' : ''}`} />
                 </button>
-                {showDropdown && (
-                  <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-violet-100 bg-white py-1.5 shadow-xl shadow-violet-950/10">
-                    <div className="border-b border-slate-100 px-4 py-2.5">
-                      <p className="truncate text-xs font-bold text-slate-800">{user.email}</p>
-                      <p className="mt-0.5 text-[10px] font-medium capitalize text-violet-600">{user.role}</p>
-                    </div>
-                    {user.role === 'requester' && <Link to="/requests/new" className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-violet-50 hover:text-violet-700"><PlusCircle size={15} />Submit Request</Link>}
-                    <button onClick={handleLogout} className="flex w-full items-center gap-2 px-4 py-2.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"><LogOut size={15} />Log Out</button>
-                  </div>
-                )}
               </div>
             </>
           ) : (
@@ -135,9 +117,9 @@ function Header() {
           )}
       </div>
 
-      <div className="flex items-center gap-1 lg:hidden">
+      <div className={`${isAuthPage ? 'hidden' : 'flex'} items-center gap-1 lg:hidden`}>
         {user && <button className="relative flex flex-shrink-0 items-center justify-center rounded-lg p-1.5 text-[#111418] transition-colors duration-200 hover:bg-violet-50 sm:p-2" aria-label="Notifications"><Bell className="h-5 w-5 sm:h-6 sm:w-6" /><span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-violet-600" /></button>}
-        <button onClick={() => setIsMobileMenuOpen((value) => !value)} className="flex flex-shrink-0 items-center justify-center rounded-lg p-1.5 text-[#111418] transition-colors duration-200 hover:bg-violet-50 sm:p-2" aria-label="Toggle navigation menu">
+        <button onClick={() => user ? setIsSettingsOpen(true) : setIsMobileMenuOpen((value) => !value)} className="flex flex-shrink-0 items-center justify-center rounded-lg p-1.5 text-[#111418] transition-colors duration-200 hover:bg-violet-50 sm:p-2" aria-label={user ? 'Open settings' : 'Toggle navigation menu'}>
           {isMobileMenuOpen ? <X className="h-5 w-5 sm:h-6 sm:w-6" /> : <Menu className="h-5 w-5 sm:h-6 sm:w-6" />}
         </button>
       </div>
@@ -157,6 +139,16 @@ function Header() {
             <button onClick={handleLogout} className="rounded-lg p-2.5 text-rose-600 hover:bg-rose-50" aria-label="Log out"><LogOut size={18} /></button>
           </div>
         </div>
+      )}
+
+      {user && isSettingsOpen && (
+        <Settings
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          userEmail={user.email}
+          userRole={user.role}
+          isMobile={typeof window !== 'undefined' && window.innerWidth < 1024}
+        />
       )}
     </header>
   )
