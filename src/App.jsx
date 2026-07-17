@@ -1,31 +1,10 @@
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom'
 import { Suspense, lazy, useEffect } from 'react'
-import {
-  DashboardSkeleton,
-  ListSkeleton,
-  DetailSkeleton,
-  FormSkeleton,
-  RecordsSkeleton,
-  DispatchRequestsSkeleton,
-  ApprovalRequestsSkeleton,
-  TableSkeleton,
-  FAQSkeleton,
-  PrivacySkeleton,
-  TermsSkeleton,
-  ContactSkeleton,
-  SimpleSkeleton,
-  LoginSkeleton,
-  SignUpSkeleton
-} from './components/PageSkeletons'
 import ErrorBoundary from './components/ErrorBoundary'
 import Header from './components/Header'
 import BottomNav from './components/BottomNav'
 import { AlertProvider } from './components/AlertContext'
-import apiClient from './utils/apiClient'
-import { ensureBodyScrollable } from './utils/scrollFix'
 import { getAuthOrNull } from './utils/auth'
-import { getAccessBlockMeta, refreshAccessPolicy } from './utils/accessPolicy'
-import GlobalExecutionLoader from './components/GlobalExecutionLoader'
 
 const clearStoredAuth = () => {
   try {
@@ -38,119 +17,46 @@ const clearStoredAuth = () => {
   } catch (e) { }
 }
 
-const getDashboardPathForRole = (role) => {
-  const normalizedRole = String(role || '').toLowerCase()
-
-  if (normalizedRole === 'student') return '/student'
-  if (normalizedRole === 'admin') return '/admin-dashboard'
-  if (normalizedRole === 'staff' || normalizedRole === 'hod') return '/home'
-
-  return '/login'
-}
-
-// Lazy load components for better performance
-const Home = lazy(() => import('./pages/Home'))
-const ImportMarks = lazy(() => import('./pages/ImportMarks'))
-const Marksheets = lazy(() => import('./pages/Marksheets'))
-const MarksheetDetails = lazy(() => import('./pages/MarksheetDetails'))
-const DispatchRequests = lazy(() => import('./pages/DispatchRequests'))
-const Records = lazy(() => import('./pages/Records'))
-const DepartmentOverview = lazy(() => import('./pages/DepartmentOverview'))
-const ApprovalRequests = lazy(() => import('./pages/ApprovalRequests'))
+// Lazy load components
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const CreateRequest = lazy(() => import('./pages/CreateRequest'))
+const Requests = lazy(() => import('./pages/Requests'))
+const RequestDetails = lazy(() => import('./pages/RequestDetails'))
 const Reports = lazy(() => import('./pages/Reports'))
 const Login = lazy(() => import('./pages/Login'))
 const SignUp = lazy(() => import('./pages/SignUp'))
-const Contact = lazy(() => import('./pages/Contact'))
-const StudentDashboard = lazy(() => import('./pages/StudentDashboard'))
-const Leave = lazy(() => import('./pages/Leave'))
-const LeaveApprovals = lazy(() => import('./pages/LeaveApprovals'))
-const LateAcknowledgment = lazy(() => import('./pages/LateAcknowledgment'))
-const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
-const TermsOfService = lazy(() => import('./pages/TermsOfService'))
-const FAQ = lazy(() => import('./pages/FAQ'))
 const NotFound = lazy(() => import('./pages/NotFound'))
-const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
 
-// Root route handler - checks auth and redirects accordingly
+// Root route handler
 const RootRedirect = () => {
   const parsed = getAuthOrNull()
-  if (!parsed) return <Navigate to="/login" replace />
-  const blocked = getAccessBlockMeta(parsed.role)
-  if (blocked) {
+  if (!parsed || !parsed.isAuthenticated) return <Navigate to="/login" replace />
+  return <Navigate to="/dashboard" replace />
+}
+
+// Protected route wrapper
+const ProtectedRoute = ({ children }) => {
+  const parsed = getAuthOrNull()
+  if (!parsed || !parsed.isAuthenticated) {
     clearStoredAuth()
     return <Navigate to="/login" replace />
   }
-  return <Navigate to={getDashboardPathForRole(parsed.role)} replace />
+  return children
 }
 
-// Protected route wrapper for home/dashboard
-const ProtectedHome = () => {
+// Redirect if already logged in
+const RedirectIfAuthenticated = ({ children }) => {
   const parsed = getAuthOrNull()
-  if (!parsed) return <Navigate to="/login" replace />
-  const blocked = getAccessBlockMeta(parsed.role)
-  if (blocked) return <Navigate to="/login" replace />
-  if (parsed.role === 'staff' || parsed.role === 'hod') return <Home />
-  return <Navigate to={getDashboardPathForRole(parsed.role)} replace />
-}
-
-const ProtectedStudent = () => {
-  const parsed = getAuthOrNull()
-  if (!parsed) return <Navigate to="/login" replace />
-  const blocked = getAccessBlockMeta(parsed.role)
-  if (blocked) {
-    clearStoredAuth()
-    return <Navigate to="/login" replace />
+  if (parsed && parsed.isAuthenticated) {
+    return <Navigate to="/dashboard" replace />
   }
-  if (String(parsed.role || '').toLowerCase() !== 'student') {
-    return <Navigate to={getDashboardPathForRole(parsed.role)} replace />
-  }
-  return <StudentDashboard />
-}
-
-const ProtectedAdmin = () => {
-  const parsed = getAuthOrNull()
-  if (!parsed) return <Navigate to="/login" replace />
-  const blocked = getAccessBlockMeta(parsed.role)
-  if (blocked) {
-    clearStoredAuth()
-    return <Navigate to="/login" replace />
-  }
-  if (String(parsed.role || '').toLowerCase() !== 'admin') {
-    return <Navigate to={getDashboardPathForRole(parsed.role)} replace />
-  }
-  return <AdminDashboard />
-}
-
-// Staff or HOD only - redirects students and unauthenticated users
-const ProtectedStaffOrHod = ({ children }) => {
-  const parsed = getAuthOrNull()
-  if (!parsed) return <Navigate to="/login" replace />
-  const blocked = getAccessBlockMeta(parsed.role)
-  if (blocked) {
-    clearStoredAuth()
-    return <Navigate to="/login" replace />
-  }
-  const normalizedRole = String(parsed.role || '').toLowerCase()
-  if (normalizedRole === 'staff' || normalizedRole === 'hod') return children
-  return <Navigate to={getDashboardPathForRole(parsed.role)} replace />
-}
-
-// Redirect to dashboard if already authenticated (for Login/SignUp)
-const RedirectIfAuthenticated = ({ children, allowAdmin = false }) => {
-  const parsed = getAuthOrNull()
-  if (!parsed) return children
-  const blocked = getAccessBlockMeta(parsed.role)
-  if (blocked) return children
-  // Allow admin to access signup page for creating new users
-  if (allowAdmin && parsed.role === 'admin') return children
-  return <Navigate to={getDashboardPathForRole(parsed.role)} replace />
+  return children
 }
 
 function AppContent() {
   const location = useLocation()
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup'
 
-  // Remove body background when not on auth pages
   useEffect(() => {
     if (!isAuthPage) {
       document.body.style.backgroundImage = 'none'
@@ -160,94 +66,54 @@ function AppContent() {
     } else {
       document.body.classList.add('auth-page')
       document.documentElement.classList.add('auth-page')
-      // Prefer AVIF/WebP via CSS image-set when supported; fallback to WebP/JPEG
-      let bgImage = "url('/images/campus.jpeg')"
-      try {
-        const avifImageSet = "image-set(url('/images/campus.avif') type('image/avif') 1x, url('/images/campus.webp') type('image/webp') 1x, url('/images/campus.jpeg') 1x)"
-        if (typeof CSS !== 'undefined' && CSS.supports && CSS.supports('background-image', avifImageSet)) {
-          bgImage = avifImageSet
-        } else if (typeof CSS !== 'undefined' && CSS.supports && CSS.supports('background-image', "url('/images/campus.webp')")) {
-          bgImage = "url('/images/campus.webp')"
-        }
-      } catch (e) {}
-      document.body.style.backgroundImage = bgImage
-      document.documentElement.style.backgroundImage = bgImage
+      
+      // Purple gradient styled auth page
+      document.body.style.background = 'radial-gradient(circle at top left, #120e2e, #070716, #220735)'
+      document.documentElement.style.background = 'radial-gradient(circle at top left, #120e2e, #070716, #220735)'
       document.documentElement.style.backgroundSize = 'cover'
       document.documentElement.style.backgroundPosition = 'center'
       document.documentElement.style.backgroundAttachment = 'fixed'
-      document.documentElement.style.backgroundRepeat = 'no-repeat'
     }
     return () => {
       document.body.classList.remove('auth-page')
       document.documentElement.classList.remove('auth-page')
       document.body.style.backgroundImage = 'none'
       document.documentElement.style.backgroundImage = 'none'
-      document.documentElement.style.backgroundSize = ''
-      document.documentElement.style.backgroundPosition = ''
-      document.documentElement.style.backgroundAttachment = ''
-      document.documentElement.style.backgroundRepeat = ''
     }
   }, [isAuthPage])
 
-  // Ping both backend servers on load to wake up Render services
-  useEffect(() => {
-    refreshAccessPolicy().catch(() => {})
-    // Ping local API (Vercel proxy)
-    apiClient.get('/api/generate-pdf?test=true').catch(() => { })
-    // Removed unreachable Academics backend health check
-    // Removed unreachable Evolution API health check
-  }, [])
-
   return (
     <>
-      <GlobalExecutionLoader />
       <div
         className={`flex w-full flex-col ${isAuthPage ? 'relative auth-wrapper' : ''}`}
         style={{
-          fontFamily: 'Inter, Manrope, sans-serif',
-          WebkitOverflowScrolling: 'touch',
-          minHeight: '100vh',
-          height: 'auto',
-          overflow: 'visible',
-          overflowY: 'auto',
-          overflowX: 'hidden'
+          fontFamily: "'Plus Jakarta Sans', 'Outfit', sans-serif",
+          minHeight: '100vh'
         }}
       >
-        {isAuthPage && <div className="fixed inset-0 bg-black/40 z-0 pointer-events-none"></div>}
-        <div className={`layout-container flex min-h-screen flex-col max-w-full ${isAuthPage ? 'relative z-10' : 'bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50'}`}>
+        <div className={`layout-container flex min-h-screen flex-col max-w-full ${isAuthPage ? 'relative z-10' : 'bg-[#FAF7F0] text-slate-800'}`}>
           <Header />
           <div className="flex flex-1 justify-center w-full">
-            <div className={`layout-content-container flex flex-col w-full max-w-full ${!isAuthPage ? 'pb-20 md:pb-0' : ''}`}>
-              <Routes>
-                {/* Root path - redirects based on auth status */}
-                <Route path="/" element={<RootRedirect />} />
-                {/* Home/Dashboard - protected route */}
-                <Route path="/home" element={<Suspense fallback={<DashboardSkeleton />}><ProtectedHome /></Suspense>} />
-                <Route path="/student" element={<Suspense fallback={<DashboardSkeleton />}><ProtectedStudent /></Suspense>} />
-                <Route path="/admin-dashboard" element={<Suspense fallback={<DashboardSkeleton />}><ProtectedAdmin /></Suspense>} />
-                <Route path="/leave" element={<Suspense fallback={<FormSkeleton />}><Leave /></Suspense>} />
-                {/* Staff/HOD Routes - protected by role */}
-                <Route path="/import-marks" element={<Suspense fallback={<FormSkeleton />}><ProtectedStaffOrHod><ImportMarks /></ProtectedStaffOrHod></Suspense>} />
-                <Route path="/marksheets" element={<Suspense fallback={<ListSkeleton />}><ProtectedStaffOrHod><Marksheets /></ProtectedStaffOrHod></Suspense>} />
-                <Route path="/marksheets/:id" element={<Suspense fallback={<DetailSkeleton />}><ProtectedStaffOrHod><MarksheetDetails /></ProtectedStaffOrHod></Suspense>} />
-                <Route path="/dispatch-requests" element={<Suspense fallback={<DispatchRequestsSkeleton />}><ProtectedStaffOrHod><DispatchRequests /></ProtectedStaffOrHod></Suspense>} />
-                <Route path="/records" element={<Suspense fallback={<RecordsSkeleton />}><ProtectedStaffOrHod><Records /></ProtectedStaffOrHod></Suspense>} />
-                <Route path="/department-overview" element={<Suspense fallback={<DashboardSkeleton />}><ProtectedStaffOrHod><DepartmentOverview /></ProtectedStaffOrHod></Suspense>} />
-                <Route path="/approval-requests" element={<Suspense fallback={<ApprovalRequestsSkeleton />}><ProtectedStaffOrHod><ApprovalRequests /></ProtectedStaffOrHod></Suspense>} />
-                <Route path="/leave-approvals" element={<Suspense fallback={<ApprovalRequestsSkeleton />}><ProtectedStaffOrHod><LeaveApprovals /></ProtectedStaffOrHod></Suspense>} />
-                <Route path="/late-acknowledgment" element={<Suspense fallback={<ListSkeleton />}><ProtectedStaffOrHod><LateAcknowledgment /></ProtectedStaffOrHod></Suspense>} />
-                <Route path="/reports" element={<Suspense fallback={<TableSkeleton />}><ProtectedStaffOrHod><Reports /></ProtectedStaffOrHod></Suspense>} />
-                {/* Auth Routes - redirect to dashboard if already logged in */}
-                <Route path="/login" element={<Suspense fallback={<LoginSkeleton />}><RedirectIfAuthenticated><Login /></RedirectIfAuthenticated></Suspense>} />
-                <Route path="/signup" element={<Suspense fallback={<SignUpSkeleton />}><RedirectIfAuthenticated allowAdmin><SignUp /></RedirectIfAuthenticated></Suspense>} />
-                {/* General Routes */}
-                <Route path="/contact" element={<Suspense fallback={<ContactSkeleton />}><Contact /></Suspense>} />
-                <Route path="/privacy-policy" element={<Suspense fallback={<PrivacySkeleton />}><PrivacyPolicy /></Suspense>} />
-                <Route path="/terms-of-service" element={<Suspense fallback={<TermsSkeleton />}><TermsOfService /></Suspense>} />
-                <Route path="/faq" element={<Suspense fallback={<FAQSkeleton />}><FAQ /></Suspense>} />
-                {/* Fallback route for 404 */}
-                <Route path="*" element={<Suspense fallback={<SimpleSkeleton />}><NotFound /></Suspense>} />
-              </Routes>
+            <div className={`layout-content-container flex flex-col w-full max-w-7xl px-4 py-6 ${!isAuthPage ? 'pb-24 md:pb-6' : ''}`}>
+              <Suspense fallback={
+                <div className="flex items-center justify-center min-h-[50vh]">
+                  <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-violet-500"></div>
+                </div>
+              }>
+                <Routes>
+                  <Route path="/" element={<RootRedirect />} />
+                  <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                  <Route path="/requests" element={<ProtectedRoute><Requests /></ProtectedRoute>} />
+                  <Route path="/requests/new" element={<ProtectedRoute><CreateRequest /></ProtectedRoute>} />
+                  <Route path="/requests/:id" element={<ProtectedRoute><RequestDetails /></ProtectedRoute>} />
+                  <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+                  
+                  <Route path="/login" element={<RedirectIfAuthenticated><Login /></RedirectIfAuthenticated>} />
+                  <Route path="/signup" element={<RedirectIfAuthenticated><SignUp /></RedirectIfAuthenticated>} />
+                  
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
             </div>
           </div>
         </div>
@@ -258,12 +124,6 @@ function AppContent() {
 }
 
 function App() {
-  // Ensure body scrolling is never permanently blocked
-  useEffect(() => {
-    const cleanup = ensureBodyScrollable()
-    return cleanup
-  }, [])
-
   return (
     <ErrorBoundary>
       <AlertProvider>

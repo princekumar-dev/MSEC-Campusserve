@@ -130,48 +130,43 @@ app.get('/', (req, res) => {
 });
 
 // API routes
-
-// import healthHandler from './api/health.js';
 import authHandler from './api/auth.js';
 import usersHandler from './api/users.js';
-import marksheetsHandler from './api/marksheets.js';
-import importExcelHandler from './api/import-excel.js';
-import whatsappDispatchHandler from './api/whatsapp-dispatch.js';
+import requestsHandler from './api/requests.js';
+import quotationsHandler from './api/quotations.js';
+import workOrdersHandler from './api/work-orders.js';
+import invoicesHandler from './api/invoices.js';
+import paymentsHandler from './api/payments.js';
+import reportsHandler from './api/reports.js';
 import generatePdfHandler from './api/generate-pdf.js';
 import notificationsRouter from './api/notifications.js';
-import examinationsHandler from './api/examinations.js';
-import subscriptionCheckHandler from './api/subscription-check.js';
-import leavesHandler from './api/leaves.js';
-import staffApprovalHandler from './api/staff-approval.js';
-// Health check endpoint removed; now handled in generate-pdf.js
 
 // Debug endpoint to verify server is updated
 app.get('/api/debug', (req, res) => {
   res.json({ 
-    message: 'MSEC Academics Server is running!', 
+    message: 'CampusServe Pro Server is running!', 
     timestamp: new Date().toISOString(),
-    academicsSystem: true,
-    version: '2.0.0'
+    campusServeSystem: true,
+    version: '1.0.0'
   });
 });
 
 // Health endpoint: quick DB connection state and server timestamp
 app.get('/api/health', (req, res) => {
-  const dbState = mongoose?.connection?.readyState ?? 0; // 0=disconnected,1=connected,2=connecting,3=disconnecting
+  const dbState = mongoose?.connection?.readyState ?? 0;
   res.json({ ok: true, timestamp: new Date().toISOString(), dbState });
 });
 
 app.all('/api/auth', authHandler);
 app.all('/api/users', usersHandler);
-app.all('/api/marksheets', marksheetsHandler);
-app.all('/api/import-excel', importExcelHandler);
-app.all('/api/whatsapp-dispatch', whatsappDispatchHandler);
+app.all('/api/requests', requestsHandler);
+app.all('/api/quotations', quotationsHandler);
+app.all('/api/work-orders', workOrdersHandler);
+app.all('/api/invoices', invoicesHandler);
+app.all('/api/payments', paymentsHandler);
+app.all('/api/reports', reportsHandler);
 app.all('/api/generate-pdf', generatePdfHandler);
 app.use('/api/notifications', notificationsRouter);
-app.all('/api/examinations', examinationsHandler);
-app.all('/api/subscription-check', subscriptionCheckHandler);
-app.all('/api/leaves', leavesHandler);
-app.all('/api/staff-approval', staffApprovalHandler);
 
 // Connect to MongoDB and start server
 connectToDatabase()

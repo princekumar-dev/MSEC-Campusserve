@@ -1,418 +1,167 @@
-import { useMemo, useState, useEffect } from 'react'
-import apiClient from '../utils/apiClient'
-import { getUserFriendlyMessage } from '../utils/apiErrorMessages'
-import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAlert } from '../components/AlertContext'
-import { getAccessBlockMeta, getAccessPolicy, getAccessWindowLabel } from '../utils/accessPolicy'
+import apiClient from '../utils/apiClient'
+import { User, Key, ArrowRight } from 'lucide-react'
 
-const LOGIN_TAB_STORAGE_KEY = 'msec:login_tab'
-
-const getInitialLoginType = () => {
-  try {
-    const savedLoginType = localStorage.getItem(LOGIN_TAB_STORAGE_KEY)
-    if (savedLoginType === 'student' || savedLoginType === 'staff') {
-      return savedLoginType
-    }
-  } catch (e) {
-    // Ignore storage errors and use default mode.
-  }
-  return 'staff'
-}
-
-const getMessageTone = (message) => {
-  const normalizedMessage = String(message || '').toLowerCase()
-
-  if (
-    normalizedMessage.includes('waiting for hod approval') ||
-    normalizedMessage.includes('wait for hod approval') ||
-    normalizedMessage.includes('rejected by the hod')
-  ) {
-    return 'info'
-  }
-
-  return 'error'
-}
-
-const showLoginStatusAlert = ({ message, showError, showWarning }) => {
-  if (getMessageTone(message) === 'info') {
-    showWarning('Approval Pending', message)
-    return
-  }
-
-  const normalizedMessage = String(message || '').toLowerCase()
-
-  if (normalizedMessage.includes('invalid email')) {
-    showError('Invalid Email', 'Invalid email address. Need help? Contact support@msec.edu.in')
-    return
-  }
-
-  showError('Login Failed', message)
-}
+const demoCredentials = [
+  { role: 'Requester', email: 'faculty@campuserve.com', desc: 'Raise requests' },
+  { role: 'Admin', email: 'admin@campuserve.com', desc: 'Approve & assign' },
+  { role: 'Manager', email: 'manager@campuserve.com', desc: 'Estimate & invoice' },
+  { role: 'Technician', email: 'tech@campuserve.com', desc: 'Update & log work' },
+  { role: 'Accounts', email: 'accounts@campuserve.com', desc: 'Record payments' }
+]
 
 function Login() {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    regNumber: '',
-    loginType: getInitialLoginType()
-  })
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState('')
   const navigate = useNavigate()
-  const { showSuccess, showError, showWarning } = useAlert()
-  const accessPolicy = getAccessPolicy()
-  const accessBlocked = useMemo(() => {
-    if (formData.loginType === 'student') {
-      return getAccessBlockMeta('student')
-    }
+  const { showSuccess, showError } = useAlert()
 
-    // Admin and staff share the same login mode; final role-based window checks run on the server.
-    return null
-  }, [formData.loginType])
-  const messageTone = useMemo(() => getMessageTone(error), [error])
-
-  // Auth guard: redirect if already logged in
-  useEffect(() => {
-    try {
-      const auth = localStorage.getItem('auth')
-      if (auth) {
-        const authData = JSON.parse(auth)
-        if (authData?.isAuthenticated && authData?.id) {
-          navigate('/', { replace: true })
-        }
-      }
-    } catch (e) {
-      // Ignore storage/parsing errors
-    }
-  }, [navigate])
-
-  const switchLoginType = (nextType) => {
-    const normalizedType = nextType === 'student' ? 'student' : 'staff'
-
-    try {
-      localStorage.setItem(LOGIN_TAB_STORAGE_KEY, normalizedType)
-    } catch (e) {
-      // Ignore storage errors and continue UI switch.
-    }
-
-    setFormData(prev => {
-      if (normalizedType === 'student') {
-        return {
-          ...prev,
-          loginType: 'student',
-          email: '',
-          password: '',
-          regNumber: ''
-        }
-      }
-
-      return {
-        ...prev,
-        loginType: 'staff',
-        regNumber: '',
-        password: ''
-      }
-    })
-    if (error) setError('')
-  }
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
-    // Clear error when user starts typing
-    if (error) setError('')
-  }
-
-  const handleSubmit = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault()
-    setIsLoading(true)
-    setError('')
-
-    const isStudent = formData.loginType === 'student'
-
-    if (accessBlocked) {
-      setError(accessBlocked.message)
-      showError(accessBlocked.title, accessBlocked.message)
-      setIsLoading(false)
+    if (!email || !password) {
+      showError('Required Fields', 'Please enter your email and password')
       return
     }
 
-    // Basic validation per mode
-    if (isStudent) {
-      if (!formData.regNumber || !formData.password) {
-        const missing = !formData.regNumber ? 'registration number' : 'password'
-        setError(`📝 Please enter your ${missing} to continue.`)
-        setIsLoading(false)
-        return
-      }
-    } else {
-      if (!formData.email || !formData.password) {
-        const missing = !formData.email ? 'email address' : 'password'
-        setError(`📝 Please enter your ${missing} to continue.`)
-        setIsLoading(false)
-        return
-      }
-      const emailDomain = formData.email.toLowerCase().split('@')[1]
-      if (emailDomain !== 'msec.edu.in') {
-        setError('🏫 Only MSEC institutional emails are allowed. Use your @msec.edu.in email address.')
-        setIsLoading(false)
-        return
-      }
-    }
-
+    setIsLoading(true)
     try {
-      const data = await apiClient.post('/api/auth', formData)
-
-      if (data.success) {
-        // Set authentication state in localStorage
+      const res = await apiClient.post('/api/auth', { email, password })
+      if (res.success && res.user) {
         const authData = {
           isAuthenticated: true,
-          email: data.user.email,
-          name: data.user.name,
-          role: data.user.role,
-          department: data.user.department,
-          id: data.user.id,
-          year: data.user.year,
-          section: data.user.section,
-          regNumber: data.user.regNumber,
-          phoneNumber: data.user.phoneNumber,
-          parentPhoneNumber: data.user.parentPhoneNumber,
-          eSignature: data.user.eSignature || null,
-          loginTime: new Date().toISOString()
+          id: res.user.id,
+          email: res.user.email,
+          name: res.user.name,
+          role: res.user.role,
+          department: res.user.department,
+          phoneNumber: res.user.phoneNumber,
+          eSignature: res.user.eSignature
         }
         localStorage.setItem('auth', JSON.stringify(authData))
-
-        // Also save individual items for backward compatibility
         localStorage.setItem('isLoggedIn', 'true')
-        if (data.user.email) localStorage.setItem('userEmail', data.user.email)
-        localStorage.setItem('userRole', data.user.role)
-        localStorage.setItem('userId', data.user.id)
-
-        // Try to fetch canonical profile for staff/hod/admin so the welcome message matches dashboard
-        let displayName = data.user.name
-        if (data.user.role !== 'student') {
-          try {
-            const profile = await apiClient.get(`/api/users?action=profile&userId=${data.user.id}`)
-            if (profile?.success && profile.user) {
-              const merged = { ...authData, ...profile.user }
-              localStorage.setItem('auth', JSON.stringify(merged))
-              displayName = profile.user.name || displayName
-            }
-          } catch (err) {
-            // Non-fatal - proceed with server-returned name
-          }
-        }
-
-        // Show success alert with the canonical name when available
-        showSuccess('Welcome Back!', `Logged in as ${displayName}`)
-
-        // Redirect to root page which will handle role-based routing
-        setTimeout(() => {
-          navigate('/', { replace: true })
-          // Trigger a custom event to update header authentication state
-          window.dispatchEvent(new Event('authStateChanged'))
-        }, 500)
+        localStorage.setItem('userRole', res.user.role)
+        localStorage.setItem('userId', res.user.id)
+        
+        window.dispatchEvent(new Event('authStateChanged'))
+        showSuccess('Welcome Back!', `Logged in successfully as ${res.user.name}`)
+        navigate('/dashboard')
       } else {
-        const errorMsg = data.error || '🔐 Invalid credentials. Please check your email and password, then try again.'
-        setError(errorMsg)
-        showLoginStatusAlert({ message: errorMsg, showError, showWarning })
+        showError('Login Failed', res.error || 'Invalid credentials')
       }
-    } catch (error) {
-      const errorMsg = getUserFriendlyMessage(error, 'Login failed. Please try again or contact support.')
-      setError(errorMsg)
-      showLoginStatusAlert({ message: errorMsg, showError, showWarning })
+    } catch (err) {
+      showError('Authentication Error', err.message || 'Server error occurred during login')
     } finally {
       setIsLoading(false)
     }
   }
 
+  const fillCredentials = (demoEmail) => {
+    setEmail(demoEmail)
+    setPassword('campus123')
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center px-3 sm:px-4 py-6 sm:py-8">
-      <style>
-        {`
-          @keyframes waveButtonAnimation {
-            0%, 100% {
-              background-position: 0% 50%;
-            }
-            50% {
-              background-position: 100% 50%;
-            }
-          }
-          
-          .login-wave-button {
-            background: linear-gradient(90deg, var(--theme-gold-600), var(--theme-gold-300), var(--theme-gold-600), var(--theme-gold-300));
-            background-size: 300% 100%;
-            animation: waveButtonAnimation 3s ease-in-out infinite;
-            transition: all 0.3s ease;
-          }
-          
-          .login-wave-button:hover {
-            animation-duration: 1.5s;
-          }
-        `}
-      </style>
+    <div className="flex-1 flex flex-col items-center justify-center min-h-[75vh] px-4 py-8 relative">
+      
+      {/* Visual background lights */}
+      <div className="absolute top-1/4 left-1/4 h-72 w-72 bg-violet-600/10 rounded-full blur-[100px] pointer-events-none"></div>
+      <div className="absolute bottom-1/4 right-1/4 h-72 w-72 bg-indigo-600/10 rounded-full blur-[100px] pointer-events-none"></div>
 
-      <div className="relative z-10 w-full max-w-md mx-auto">
-        {accessBlocked && (
-          <div className="mb-4 sm:mb-6 w-full">
-            <div className="rounded-2xl sm:rounded-3xl border border-white/30 bg-white/20 backdrop-blur-xl shadow-2xl p-4 sm:p-6">
-              <div className="flex items-start gap-2.5 sm:gap-3">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-amber-400/20 border border-amber-300/40 flex items-center justify-center shrink-0">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-amber-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" />
-                  </svg>
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-white text-base sm:text-lg font-extrabold">{accessBlocked.title}</h3>
-                  <p className="text-white/90 text-xs sm:text-sm mt-1 leading-relaxed">{accessBlocked.message}</p>
-                  <p className="text-white/80 text-[11px] sm:text-xs mt-2.5 sm:mt-3">Allowed time: {getAccessWindowLabel()} (IST)</p>
-                </div>
-              </div>
+      <div className="w-full max-w-md glass-card-purple p-8 rounded-2xl relative z-10 border border-violet-500/20">
+        
+        {/* Brand */}
+        <div className="text-center mb-8">
+          <h2 className="font-display font-extrabold text-3xl tracking-tight text-white">
+            Welcome to <span className="wave-text">CampusServe</span>
+          </h2>
+          <p className="text-sm text-slate-400 mt-2">
+            Log in to manage campus service and maintenance operations
+          </p>
+        </div>
+
+        {/* Login Form */}
+        <form onSubmit={handleLogin} className="space-y-5">
+          <div>
+            <label className="block text-xs font-semibold text-violet-300 uppercase tracking-wider mb-2">
+              Email Address
+            </label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-violet-400/70">
+                <User size={16} />
+              </span>
+              <input
+                type="email"
+                placeholder="you@campuserve.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-slate-950/60 border border-violet-950/60 focus:border-violet-500 rounded-xl py-3 pl-11 pr-4 text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all"
+              />
             </div>
           </div>
-        )}
 
-        <div className="w-full relative z-10">
-          <div className="backdrop-blur-md bg-white/20 border border-white/30 p-5 sm:p-8 rounded-2xl sm:rounded-3xl shadow-2xl">
-            <div className="text-center mb-6 sm:mb-8">
-              <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-blue-100 rounded-full mb-4 sm:mb-6">
-                <svg className="w-7 h-7 sm:w-8 sm:h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-              </div>
-              <h1 className="text-2xl sm:text-4xl font-black text-white mb-1.5 sm:mb-2">Welcome Back</h1>
-              <p className="text-gray-100 text-sm sm:text-lg">Sign in to your MSEC Academics account</p>
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-xs font-semibold text-violet-300 uppercase tracking-wider">
+                Password
+              </label>
             </div>
-
-            {/* Status Message */}
-            {error && (
-              <div className="mb-6">
-                <div className={`backdrop-blur-sm p-4 border-l-4 rounded-lg ${
-                  messageTone === 'info'
-                    ? 'bg-yellow-50/95 border border-yellow-200 border-l-yellow-400'
-                    : 'bg-red-500/20 border border-red-400/50 border-l-red-400'
-                }`}>
-                  <p className={`text-sm font-medium ${
-                    messageTone === 'info' ? 'text-yellow-800' : 'text-red-100'
-                  }`}>{error}</p>
-                </div>
-              </div>
-            )}
-
-            {formData.loginType === 'staff' && (
-              <div className="mb-6 rounded-xl border border-amber-300/50 bg-amber-100/15 backdrop-blur-sm p-3 sm:p-4">
-                <p className="text-[11px] sm:text-xs font-bold text-amber-100 uppercase tracking-wider">Current Access Window</p>
-                <p className="text-xs sm:text-sm text-amber-50 mt-1">
-                  {accessPolicy.enforceForStaffHod
-                    ? `Staff and HOD login is allowed between ${getAccessWindowLabel()} (IST).`
-                    : 'Staff and HOD time restriction is currently disabled by admin.'}
-                </p>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-                <button
-                  type="button"
-                  onClick={() => switchLoginType('staff')}
-                  className={`w-full py-2.5 sm:py-3 rounded-xl sm:rounded-2xl border text-xs sm:text-sm font-bold transition-all ${formData.loginType === 'staff' ? 'bg-white text-blue-700 border-white' : 'bg-white/10 text-white border-white/30'}`}
-                >
-                  Staff / HOD
-                </button>
-                <button
-                  type="button"
-                  onClick={() => switchLoginType('student')}
-                  className={`w-full py-2.5 sm:py-3 rounded-xl sm:rounded-2xl border text-xs sm:text-sm font-bold transition-all ${formData.loginType === 'student' ? 'bg-white text-blue-700 border-white' : 'bg-white/10 text-white border-white/30'}`}
-                >
-                  Student
-                </button>
-              </div>
-
-              {formData.loginType === 'staff' && (
-                <div>
-                  <label className="block text-sm font-bold text-white mb-3">
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    autoComplete="username"
-                    pattern=".*@msec\.edu\.in$"
-                    title="Please use your MSEC email address (@msec.edu.in)"
-                    className="w-full px-4 py-3 sm:py-4 border-0 rounded-xl sm:rounded-2xl backdrop-blur-sm bg-white/20 border border-white/30 focus:ring-2 focus:ring-blue-300 focus:outline-none transition-all duration-200 text-white placeholder:text-gray-200"
-                    placeholder="Enter your MSEC email address"
-                    required={formData.loginType === 'staff'}
-                  />
-                </div>
-              )}
-
-              {formData.loginType === 'student' && (
-                <div>
-                  <label className="block text-sm font-bold text-white mb-3">
-                    Registration Number
-                  </label>
-                  <input
-                    type="text"
-                    name="regNumber"
-                    value={formData.regNumber}
-                    onChange={handleInputChange}
-                    autoComplete="username"
-                    autoCapitalize="characters"
-                    className="w-full px-4 py-3 sm:py-4 border-0 rounded-xl sm:rounded-2xl backdrop-blur-sm bg-white/20 border border-white/30 focus:ring-2 focus:ring-blue-300 focus:outline-none transition-all duration-200 text-white placeholder:text-gray-200"
-                    placeholder="Enter your registration number"
-                    required={formData.loginType === 'student'}
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-bold text-white mb-3">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  name={formData.loginType === 'student' ? 'passwordStudent' : 'passwordStaff'}
-                  value={formData.password}
-                  onChange={(e) => {
-                    setFormData(prev => ({ ...prev, password: e.target.value }))
-                    if (error) setError('')
-                  }}
-                  autoComplete={formData.loginType === 'student' ? 'current-password' : 'current-password'}
-                  className="w-full px-4 py-3 sm:py-4 border-0 rounded-xl sm:rounded-2xl backdrop-blur-sm bg-white/20 border border-white/30 focus:ring-2 focus:ring-blue-300 focus:outline-none transition-all duration-200 text-white placeholder:text-gray-200"
-                  placeholder="Enter your password"
-                  required
-                />
-              </div>
-
-              <div className="pt-4">
-                <button
-                  type="submit"
-                  disabled={isLoading || !!accessBlocked}
-                  className="glass-button w-full py-3.5 sm:py-4 px-6 text-blue-600 text-base sm:text-lg font-bold rounded-xl sm:rounded-2xl transition-all duration-300 md:hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="truncate">
-                    {isLoading ? 'Signing in...' : accessBlocked ? 'Access Restricted' : 'Sign In'}
-                  </span>
-                </button>
-              </div>
-            </form>
-
-            {formData.loginType === 'staff' && (
-              <div className="mt-8 text-center">
-                <p className="text-gray-100 text-sm">
-                  Don't have an account?
-                  <span className="text-blue-600 font-semibold cursor-pointer hover:underline ml-1" onClick={() => navigate('/signup')}>
-                    Sign up
-                  </span>
-                </p>
-              </div>
-            )}
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-violet-400/70">
+                <Key size={16} />
+              </span>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-slate-950/60 border border-violet-950/60 focus:border-violet-500 rounded-xl py-3 pl-11 pr-4 text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all"
+              />
+            </div>
           </div>
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full purple-glow-btn py-3 font-semibold text-sm flex items-center justify-center space-x-2 text-white transition-all disabled:opacity-50"
+          >
+            {isLoading ? (
+              <div className="h-5 w-5 border-t-2 border-r-2 border-white rounded-full animate-spin"></div>
+            ) : (
+              <>
+                <span>Secure Log In</span>
+                <ArrowRight size={16} />
+              </>
+            )}
+          </button>
+        </form>
+
+        {/* Credentials Autocomplete Widget */}
+        <div className="mt-8 pt-6 border-t border-violet-950/40">
+          <span className="block text-xs font-bold text-violet-400 tracking-wider uppercase mb-3">
+            Quick Testing Accounts
+          </span>
+          <div className="grid grid-cols-2 gap-2">
+            {demoCredentials.map((cred) => (
+              <button
+                key={cred.role}
+                onClick={() => fillCredentials(cred.email)}
+                className="text-left p-2.5 rounded-lg bg-slate-950/40 hover:bg-violet-950/30 border border-violet-950/40 hover:border-violet-900/50 transition-all group"
+              >
+                <div className="text-xs font-bold text-violet-300 group-hover:text-violet-200">{cred.role}</div>
+                <div className="text-[10px] text-slate-500 overflow-hidden text-ellipsis whitespace-nowrap">{cred.email}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-6 text-center text-xs text-slate-500">
+          Need an account?{' '}
+          <Link to="/signup" className="text-violet-400 hover:text-violet-300 font-semibold underline transition-all">
+            Sign Up
+          </Link>
         </div>
       </div>
     </div>

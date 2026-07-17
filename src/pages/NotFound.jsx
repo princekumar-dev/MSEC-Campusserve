@@ -2,68 +2,32 @@ import { Link } from 'react-router-dom'
 
 function NotFound() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center smooth-scroll mobile-smoothest-scroll no-mobile-anim">
-      <div className="responsive-container">
-        <div className="glass-card no-mobile-backdrop responsive-spacing rounded-3xl text-center max-w-2xl mx-auto fade-in">
-          {/* Animated Icon */}
-          <div className="mb-6 md:mb-8">
-            <div className="inline-flex items-center justify-center w-24 h-24 md:w-32 md:h-32 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-full mb-4">
-              <svg className="w-12 h-12 md:w-16 md:h-16 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
+    <div className="flex-1 flex flex-col items-center justify-center min-h-[70vh] text-center px-4 relative">
+      <div className="absolute top-1/4 left-1/4 h-72 w-72 bg-violet-600/10 rounded-full blur-[100px] pointer-events-none"></div>
+      
+      <div className="max-w-md w-full glass-card-purple p-8 rounded-2xl border border-violet-500/20 z-10">
+        <h1 className="text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-indigo-500 mb-2">
+          404
+        </h1>
+        <h2 className="text-xl font-bold text-white mb-2">Page Not Found</h2>
+        <p className="text-sm text-slate-400 mb-6">
+          The requested page does not exist or was moved.
+        </p>
+
+        <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+          <Link
+            to="/dashboard"
+            className="purple-glow-btn w-full py-2.5 px-4 text-sm font-semibold flex items-center justify-center"
+          >
+            Go to Dashboard
+          </Link>
           
-          {/* Error Code */}
-          <h1 className="text-6xl sm:text-7xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 via-yellow-500 to-yellow-600 mb-4">
-            404
-          </h1>
-          
-          {/* Error Message */}
-          <h2 className="responsive-heading-1 text-gray-900 mb-3">
-            Page Not Found
-          </h2>
-          
-          <p className="responsive-text text-gray-600 mb-8 max-w-md mx-auto">
-            Oops! The page you're looking for doesn't exist or has been moved. Let's get you back on track.
-          </p>
-          
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
-            <Link
-              to="/home"
-              className="responsive-button bg-theme-gold text-white w-full sm:w-auto hover:shadow-lg"
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-              </svg>
-              Go Back Home
-            </Link>
-            
-            <button
-              onClick={() => window.history.back()}
-              className="responsive-button bg-gray-100 text-gray-700 w-full sm:w-auto hover:bg-gray-200"
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              Go Back
-            </button>
-          </div>
-          
-          {/* Helpful Links */}
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <p className="text-sm text-gray-500 mb-3">Quick Links:</p>
-            <div className="flex flex-wrap gap-2 justify-center">
-              <Link to="/contact" className="text-sm text-theme-gold-600 hover:text-theme-gold-700 font-medium">
-                Contact Support
-              </Link>
-              <span className="text-gray-300">•</span>
-              <Link to="/faq" className="text-sm text-theme-gold-600 hover:text-theme-gold-700 font-medium">
-                FAQ
-              </Link>
-            </div>
-          </div>
+          <button
+            onClick={() => window.history.back()}
+            className="w-full py-2.5 px-4 rounded-xl border border-violet-900/30 text-slate-300 hover:bg-violet-950/20 text-sm font-semibold transition-all"
+          >
+            Go Back
+          </button>
         </div>
       </div>
     </div>

@@ -3101,3 +3101,68 @@ body:has(header .glass-card:hover) .settings-glass-card {
     box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04) !important;
   }
 }
+
+/* ==========================================================================
+   CAMPUSSERVE PRO PREMIUM PURPLE DESIGN SYSTEM
+   ========================================================================== */
+
+:root {
+  --purple-glow: 0 0 20px rgba(139, 92, 246, 0.4);
+}
+
+.purple-theme-bg {
+  background: radial-gradient(circle at top left, #120e2e, #070716, #220735) !important;
+}
+
+.wave-text {
+  background: linear-gradient(90deg, #c084fc, #818cf8, #f472b6, #c084fc) !important;
+  background-size: 300% 100% !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  animation: wave-animation 3s ease-in-out infinite !important;
+  transition: all 0.3s ease !important;
+}
+
+.wave-text:hover {
+  animation-duration: 1.5s !important;
+  transform: scale(1.02) !important;
+}
+
+.glass-card-purple {
+  background: rgba(18, 12, 34, 0.7) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(139, 92, 246, 0.18) !important;
+  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5) !important;
+  border-radius: 1.25rem !important;
+}
+
+.glass-card-purple:hover {
+  border-color: rgba(139, 92, 246, 0.35) !important;
+  box-shadow: 0 12px 45px 0 rgba(139, 92, 246, 0.25) !important;
+  transform: translateY(-2px);
+}
+
+.purple-glow-btn {
+  background: linear-gradient(135deg, #7c3aed, #4f46e5) !important;
+  color: white !important;
+  box-shadow: 0 0 15px rgba(124, 58, 237, 0.3) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  border-radius: 0.75rem !important;
+}
+
+.purple-glow-btn:hover {
+  background: linear-gradient(135deg, #8b5cf6, #6366f1) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 0 25px rgba(124, 58, 237, 0.5) !important;
+}
+
+.purple-glow-btn:active {
+  transform: translateY(0) !important;
+}
+
+/* Global Font Overrides */
+body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, span, p, div, a {
+  font-family: 'Plus Jakarta Sans', 'Outfit', sans-serif !important;
+}
