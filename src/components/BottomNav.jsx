@@ -9,7 +9,7 @@ function BottomNav() {
   if (!auth || !auth.isAuthenticated) return null
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/90 backdrop-blur-md border-t border-violet-950/40 px-6 py-2 flex items-center justify-around">
+    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/90 backdrop-blur-md border-t border-blue-950/40 px-6 py-2 flex items-center justify-around">
       <Link 
         to="/dashboard" 
         className={`flex flex-col items-center space-y-0.5 ${

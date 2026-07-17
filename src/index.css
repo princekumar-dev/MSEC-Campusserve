@@ -45,7 +45,7 @@ body {
   font-family: 'Inter', 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   overflow-x: hidden !important;
-  overflow-y: auto !important;
+  overflow-y: visible !important;
   height: auto !important;
   min-height: 100% !important;
   scroll-behavior: auto !important;
@@ -948,12 +948,11 @@ img {
   scrollbar-color: #d39a33 #f8fafc;
 }
 
-/* Auth page: hide html/body scrollbar, let layout-container handle it */
+/* Auth page: allow natural window scroll, but customize scrollbar */
 html.auth-page,
 body.auth-page {
-  overflow: hidden !important;
-  scrollbar-width: none !important;
-  overscroll-behavior: none !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
   background-size: cover !important;
   background-position: center !important;
   background-attachment: fixed !important;
@@ -968,42 +967,25 @@ body.auth-page {
   background-color: #7a8e6b !important;
 }
 
-html.auth-page::-webkit-scrollbar,
-body.auth-page::-webkit-scrollbar {
-  display: none !important;
-}
-
-/* Auth page: disable scroll on the outer wrapper, let layout-container handle it */
-body.auth-page .auth-wrapper {
-  overflow: hidden !important;
-}
-
-/* Auth page layout-container: transparent track, white thumb */
-body.auth-page .layout-container {
-  overflow-y: auto;
-  overflow-x: hidden;
-  height: 100vh;
-  overscroll-behavior: contain;
-}
-
-body.auth-page .layout-container::-webkit-scrollbar {
+/* Auth page scrollbar (styled on the HTML element for window scroll) */
+html.auth-page::-webkit-scrollbar {
   width: 4px;
 }
 
-body.auth-page .layout-container::-webkit-scrollbar-track {
+html.auth-page::-webkit-scrollbar-track {
   background: transparent;
 }
 
-body.auth-page .layout-container::-webkit-scrollbar-thumb {
+html.auth-page::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.6);
   border-radius: 2px;
 }
 
-body.auth-page .layout-container::-webkit-scrollbar-thumb:hover {
+html.auth-page::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.85);
 }
 
-body.auth-page .layout-container {
+html.auth-page {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.6) transparent;
 }

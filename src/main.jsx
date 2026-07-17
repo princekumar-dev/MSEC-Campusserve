@@ -144,6 +144,29 @@ if (typeof window !== 'undefined') {
   window.debugSWStatus = logSWStatus
 }
 
+// Diagnostic logger for scrolling issue
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      try {
+        const targets = ["html", "body", "#root", ".layout-container", ".layout-content-container"];
+        targets.forEach(s => {
+          const e = document.querySelector(s);
+          if (e) {
+            const style = window.getComputedStyle(e);
+            console.warn(`[SCROLL-DIAG] ${s}: height=${style.height}, min-height=${style.minHeight}, max-height=${style.maxHeight}, overflow=${style.overflow}, overflow-y=${style.overflowY}, position=${style.position}`);
+          } else {
+            console.warn(`[SCROLL-DIAG] ${s}: not found`);
+          }
+        });
+        console.warn(`[SCROLL-DIAG] window: innerHeight=${window.innerHeight}, html-scrollHeight=${document.documentElement.scrollHeight}, body-scrollHeight=${document.body.scrollHeight}`);
+      } catch (e) {
+        console.warn('[SCROLL-DIAG] Error during diagnostics:', e);
+      }
+    }, 1000);
+  });
+}
+
 // Auto-register service worker if not already registered (helps ensure SWControls actions work)
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
   (async () => {

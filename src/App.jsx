@@ -57,6 +57,18 @@ function AppContent() {
   const location = useLocation()
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup'
 
+  // A modal or interrupted navigation can leave an inline scroll lock behind.
+  // Pages use normal window scrolling, so always release that lock on route changes.
+  useEffect(() => {
+    document.documentElement.style.removeProperty('overflow')
+    document.documentElement.style.removeProperty('overflow-y')
+    document.documentElement.style.removeProperty('height')
+    document.body.style.removeProperty('overflow')
+    document.body.style.removeProperty('overflow-y')
+    document.body.style.removeProperty('height')
+    document.body.classList.remove('overflow-hidden', 'no-scroll', 'modal-open')
+  }, [location.pathname])
+
   useEffect(() => {
     if (!isAuthPage) {
       document.body.style.backgroundImage = 'none'
@@ -93,8 +105,8 @@ function AppContent() {
       >
         <div className={`layout-container flex min-h-screen flex-col max-w-full ${isAuthPage ? 'relative z-10' : 'bg-[#FAF7F0] text-slate-800'}`}>
           <Header />
-          <div className="flex flex-1 justify-center w-full">
-            <div className={`layout-content-container flex flex-col w-full max-w-7xl px-4 py-6 ${!isAuthPage ? 'pb-24 md:pb-6' : ''}`}>
+          <main className="flex w-full flex-1 justify-center">
+            <div className={`layout-content-container flex w-full max-w-7xl flex-col px-4 py-6 ${!isAuthPage ? 'pb-24 md:pb-6' : ''}`}>
               <Suspense fallback={
                 <div className="flex items-center justify-center min-h-[50vh]">
                   <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-violet-500"></div>
@@ -115,7 +127,7 @@ function AppContent() {
                 </Routes>
               </Suspense>
             </div>
-          </div>
+          </main>
         </div>
       </div>
       {!isAuthPage && <BottomNav />}
