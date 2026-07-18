@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAlert } from '../components/AlertContext'
+import ModalShell from '../components/ModalShell'
 import apiClient from '../utils/apiClient'
 import { getAuthOrNull } from '../utils/auth'
 import { Building2, Plus, Phone, Mail, Star, Package, TrendingUp, CheckCircle, XCircle, AlertTriangle, Search, Edit3, Users, Truck } from 'lucide-react'
@@ -22,10 +23,10 @@ function VendorCard({ vendor, onAction }) {
             </div>
             <div>
               <h3 className="font-bold text-slate-800 text-sm">{vendor.legalName}</h3>
-              <span className="text-[10px] font-mono text-slate-400">{vendor.vendorCode}</span>
+              <span className="text-xs font-mono text-slate-400">{vendor.vendorCode}</span>
             </div>
           </div>
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusColors[vendor.status]}`}>
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${statusColors[vendor.status]}`}>
             {vendor.status}
           </span>
         </div>
@@ -48,11 +49,11 @@ function VendorCard({ vendor, onAction }) {
         <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-3">
           <div className="text-center">
             <div className="text-lg font-black text-slate-800">{vendor.totalOrders || 0}</div>
-            <div className="text-[9px] text-slate-400 uppercase tracking-wider">Orders</div>
+            <div className="text-[11px] text-slate-400 uppercase tracking-wider">Orders</div>
           </div>
           <div className="text-center">
             <div className="text-lg font-black text-violet-700">₹{((vendor.totalValue || 0) / 1000).toFixed(0)}K</div>
-            <div className="text-[9px] text-slate-400 uppercase tracking-wider">Total Value</div>
+            <div className="text-[11px] text-slate-400 uppercase tracking-wider">Total Value</div>
           </div>
         </div>
 
@@ -98,8 +99,7 @@ function AddVendorModal({ onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-8 space-y-6">
+    <ModalShell panelClassName="max-w-lg space-y-6 animate-fadeIn">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-black text-slate-800">Register New Vendor</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl font-bold">×</button>
@@ -129,8 +129,7 @@ function AddVendorModal({ onClose, onSaved }) {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </ModalShell>
   )
 }
 
@@ -209,7 +208,7 @@ export default function Vendors() {
         ].map(({ label, value, icon: Icon, color, bg }) => (
           <div key={label} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</span>
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{label}</span>
               <div className={`p-1.5 rounded-lg ${bg}`}><Icon size={14} className={color} /></div>
             </div>
             <div className="text-2xl font-black text-slate-800">{value}</div>

@@ -69,7 +69,7 @@ export default function ManagerQuotations() {
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-black text-slate-800">₹{(q.grandTotal || 0).toLocaleString('en-IN')}</div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusColors[q.status] || 'bg-slate-100 text-slate-600'}`}>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${statusColors[q.status] || 'bg-slate-100 text-slate-600'}`}>
                     {q.status?.replace(/_/g, ' ')}
                   </span>
                 </div>

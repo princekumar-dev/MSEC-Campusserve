@@ -65,7 +65,7 @@ export default function GateHistory() {
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-400 uppercase tracking-wider">
                   <th className="px-5 py-3">PO Number</th>
                   <th className="px-5 py-3">Delivery Person</th>
                   <th className="px-5 py-3">Vehicle</th>
@@ -83,7 +83,7 @@ export default function GateHistory() {
                     <td className="px-5 py-4 text-xs text-slate-700">{entry.actualVehicleNumber || '—'}</td>
                     <td className="px-5 py-4 text-xs text-slate-500">{entry.verificationMethod}</td>
                     <td className="px-5 py-4">
-                      <span className={`flex items-center gap-1 text-[10px] font-bold ${entry.decision === 'APPROVED' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      <span className={`flex items-center gap-1 text-xs font-bold ${entry.decision === 'APPROVED' ? 'text-emerald-600' : 'text-rose-600'}`}>
                         {entry.decision === 'APPROVED' ? <CheckCircle size={12} /> : <XCircle size={12} />}
                         {entry.decision}
                       </span>

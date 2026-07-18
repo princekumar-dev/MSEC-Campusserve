@@ -50,7 +50,7 @@ export default function GateVehicles() {
                   <div className="p-2 bg-amber-50 rounded-lg"><Truck size={16} className="text-amber-600" /></div>
                   <div>
                     <div className="font-mono text-sm font-bold text-slate-800">{v.actualVehicleNumber || 'Unknown'}</div>
-                    <div className="text-[10px] text-slate-400">{v.poNumber}</div>
+                    <div className="text-xs text-slate-400">{v.poNumber}</div>
                   </div>
                 </div>
                 <div className="flex items-center space-x-1 text-amber-600">

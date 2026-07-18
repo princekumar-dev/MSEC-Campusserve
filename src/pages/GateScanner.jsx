@@ -137,7 +137,7 @@ function ResultCard({ result, onClear, onReject }) {
               { label: 'Slot', value: delivery.slotStart && delivery.slotEnd ? `${delivery.slotStart} – ${delivery.slotEnd}` : '—' },
             ].map(({ label, value }) => (
               <div key={label}>
-                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{label}</div>
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{label}</div>
                 <div className="font-semibold text-slate-800 mt-0.5">{value}</div>
               </div>
             ))}
@@ -145,7 +145,7 @@ function ResultCard({ result, onClear, onReject }) {
 
           {delivery.items && delivery.items.length > 0 && (
             <div className="pt-3 border-t border-emerald-100">
-              <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Expected Items</div>
+              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Expected Items</div>
               {delivery.items.map((item, idx) => (
                 <div key={idx} className="text-xs text-slate-600 flex justify-between">
                   <span>{item.description}</span>

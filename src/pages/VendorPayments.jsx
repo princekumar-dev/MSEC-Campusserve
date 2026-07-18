@@ -32,7 +32,7 @@ export default function VendorPayments() {
       <div className="premium-kpi p-5">
         <div className="flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Received</span>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Received</span>
             <div className="text-3xl font-black text-emerald-600 mt-1">₹{totalPaid.toLocaleString('en-IN')}</div>
           </div>
           <div className="p-3 bg-emerald-50 rounded-xl"><IndianRupee size={24} className="text-emerald-600" /></div>
@@ -51,7 +51,7 @@ export default function VendorPayments() {
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-400 uppercase tracking-wider">
                   <th className="px-5 py-3">Payment #</th>
                   <th className="px-5 py-3">Amount</th>
                   <th className="px-5 py-3">Method</th>

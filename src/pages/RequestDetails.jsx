@@ -82,7 +82,7 @@ function StatusTimeline({ currentStatus }) {
           return (
             <div key={step.key} className="flex items-center">
               <div className={`step-dot ${isCompleted ? 'completed' : ''} ${isCurrent ? 'active' : ''}`} title={step.label}>
-                {isCompleted ? <Check size={10} /> : <span className="text-[9px]">{idx + 1}</span>}
+                {isCompleted ? <Check size={10} /> : <span className="text-xs">{idx + 1}</span>}
               </div>
               {idx < WORKFLOW_STEPS.length - 1 && (
                 <div className={`step-line ${isCompleted ? 'completed' : ''}`} />
@@ -101,7 +101,7 @@ function StatusTimeline({ currentStatus }) {
         ))}
       </div>
       {(isRejected || isOpen) && (
-        <div className={`mt-3 px-3 py-2 rounded-lg text-[10px] font-bold ${
+        <div className={`mt-3 px-3 py-2 rounded-lg text-xs font-bold ${
           isRejected ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
         }`}>
           {isRejected ? `Request ${currentStatus.toLowerCase()}` : `Status: ${currentStatus.replace(/_/g, ' ')}`}
@@ -571,7 +571,7 @@ function RequestDetails() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>
-                      <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                      <tr className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
                         <th className="pb-2">Type</th><th className="pb-2">Description</th><th className="pb-2 text-right">Qty</th><th className="pb-2 text-right">Price</th><th className="pb-2 text-right">Tax</th><th className="pb-2 text-right">Total</th>
                       </tr>
                     </thead>
@@ -611,21 +611,21 @@ function RequestDetails() {
                   {quoItems.map((item, idx) => (
                     <div key={idx} className="grid grid-cols-1 sm:grid-cols-6 gap-3 items-end p-4 bg-slate-50 rounded-lg border border-slate-100">
                       <div className="sm:col-span-1">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Type</label>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Type</label>
                         <select value={item.itemType} onChange={e => handleQuoItemChange(idx, 'itemType', e.target.value)} className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none">
                           <option value="MATERIAL">Material</option><option value="LABOUR">Labour</option><option value="SERVICE">Service</option>
                         </select>
                       </div>
                       <div className="sm:col-span-2">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Description</label>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Description</label>
                         <input type="text" placeholder="Description..." value={item.description} onChange={e => handleQuoItemChange(idx, 'description', e.target.value)} className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none" />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Qty</label>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Qty</label>
                         <input type="number" value={item.quantity} onChange={e => handleQuoItemChange(idx, 'quantity', e.target.value)} className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none" />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Price (₹)</label>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Price (₹)</label>
                         <input type="number" value={item.unitPrice} onChange={e => handleQuoItemChange(idx, 'unitPrice', e.target.value)} className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none" />
                       </div>
                       <button type="button" onClick={() => removeQuoItem(idx)} className="p-2 text-rose-600 hover:bg-rose-50 rounded border border-rose-100 mt-5 bg-rose-50"><Trash2 size={14} /></button>
@@ -705,17 +705,17 @@ function RequestDetails() {
                         <div key={c._id} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-100 rounded">
                           <div>
                             <div className="text-xs font-bold text-slate-700">{c.reason}</div>
-                            <div className="text-[10px] text-slate-400">{c.requestedBy}</div>
+                            <div className="text-xs text-slate-400">{c.requestedBy}</div>
                           </div>
                           <div className="flex items-center gap-3">
                             <span className="text-xs font-bold">₹{c.grandTotal.toFixed(2)}</span>
                             {c.status === 'PENDING' && auth?.role === 'admin' ? (
                               <div className="flex gap-1.5">
-                                <ActionButton variant="success" onClick={() => handleWorkflowAction(`/api/work-orders?action=approve-cost&id=${id}&costId=${c._id}`, {}, 'Approve cost?')} loading={actionLoading} className="text-[10px] py-1 px-2">Approve</ActionButton>
-                                <ActionButton variant="danger" onClick={() => handleWorkflowAction(`/api/work-orders?action=reject-cost&id=${id}&costId=${c._id}`, {}, 'Reject cost?')} loading={actionLoading} className="text-[10px] py-1 px-2">Reject</ActionButton>
+                                <ActionButton variant="success" onClick={() => handleWorkflowAction(`/api/work-orders?action=approve-cost&id=${id}&costId=${c._id}`, {}, 'Approve cost?')} loading={actionLoading} className="text-xs py-1 px-2">Approve</ActionButton>
+                                <ActionButton variant="danger" onClick={() => handleWorkflowAction(`/api/work-orders?action=reject-cost&id=${id}&costId=${c._id}`, {}, 'Reject cost?')} loading={actionLoading} className="text-xs py-1 px-2">Reject</ActionButton>
                               </div>
                             ) : (
-                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${c.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : c.status === 'REJECTED' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{c.status}</span>
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded ${c.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : c.status === 'REJECTED' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{c.status}</span>
                             )}
                           </div>
                         </div>
@@ -766,7 +766,7 @@ function RequestDetails() {
                             <input type="number" placeholder="%" value={progressPercent} onChange={e => setProgressPercent(e.target.value)} className="bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none" />
                             <input type="text" placeholder="Note..." value={progressNote} onChange={e => setProgressNote(e.target.value)} className="col-span-3 bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none" />
                           </div>
-                          <ActionButton variant="ghost" onClick={() => handleWorkflowAction(`/api/work-orders?action=update&id=${id}`, { progressPercent, note: progressNote })} loading={actionLoading} className="text-[10px] py-1.5">Post Update</ActionButton>
+                          <ActionButton variant="ghost" onClick={() => handleWorkflowAction(`/api/work-orders?action=update&id=${id}`, { progressPercent, note: progressNote })} loading={actionLoading} className="text-xs py-1.5">Post Update</ActionButton>
 
                           <div className="border-t border-slate-200 pt-3 space-y-2">
                             <h5 className="text-xs font-bold text-slate-800">Add Material</h5>
@@ -775,7 +775,7 @@ function RequestDetails() {
                               <input type="number" placeholder="Qty" value={materialQty} onChange={e => setMaterialQty(e.target.value)} className="bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none" />
                               <input type="number" placeholder="Cost/unit ₹" value={materialUnitCost} onChange={e => setMaterialUnitCost(e.target.value)} className="bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none" />
                             </div>
-                            <ActionButton variant="ghost" onClick={() => handleWorkflowAction(`/api/work-orders?action=material&id=${id}`, { description: materialDesc, quantity: materialQty, unit: materialUnit, unitCost: materialUnitCost })} loading={actionLoading} className="text-[10px] py-1.5">Add Material</ActionButton>
+                            <ActionButton variant="ghost" onClick={() => handleWorkflowAction(`/api/work-orders?action=material&id=${id}`, { description: materialDesc, quantity: materialQty, unit: materialUnit, unitCost: materialUnitCost })} loading={actionLoading} className="text-xs py-1.5">Add Material</ActionButton>
                           </div>
                         </div>
 
@@ -783,7 +783,7 @@ function RequestDetails() {
                           <h5 className="text-xs font-bold text-slate-800">Extra Budget</h5>
                           <input type="text" placeholder="Reason..." value={costReason} onChange={e => setCostReason(e.target.value)} className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none" />
                           <input type="number" placeholder="Amount ₹" value={costSubtotal} onChange={e => setCostSubtotal(e.target.value)} className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none" />
-                          <ActionButton variant="ghost" onClick={() => handleWorkflowAction(`/api/work-orders?action=additional-cost&id=${id}`, { reason: costReason, subtotal: costSubtotal, taxTotal: costTax })} loading={actionLoading} className="text-[10px] py-1.5">Submit Cost Request</ActionButton>
+                          <ActionButton variant="ghost" onClick={() => handleWorkflowAction(`/api/work-orders?action=additional-cost&id=${id}`, { reason: costReason, subtotal: costSubtotal, taxTotal: costTax })} loading={actionLoading} className="text-xs py-1.5">Submit Cost Request</ActionButton>
 
                           <div className="border-t border-slate-200 pt-3 space-y-2">
                             <h5 className="text-xs font-bold text-slate-800">Complete</h5>
@@ -831,7 +831,7 @@ function RequestDetails() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>
-                      <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                      <tr className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
                         <th className="pb-2">Description</th><th className="pb-2 text-right">Qty</th><th className="pb-2 text-right">Price</th><th className="pb-2 text-right">Total</th>
                       </tr>
                     </thead>
@@ -916,11 +916,11 @@ function RequestDetails() {
                     <div key={p._id} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-100 rounded-lg">
                       <div>
                         <div className="font-bold text-slate-800 text-xs">{p.paymentNumber}</div>
-                        <div className="text-[10px] text-slate-400">{p.method} · {p.referenceNumber || 'N/A'}</div>
+                        <div className="text-xs text-slate-400">{p.method} · {p.referenceNumber || 'N/A'}</div>
                       </div>
                       <div className="text-right">
                         <div className="font-bold text-emerald-600 text-sm">₹{p.amount.toFixed(2)}</div>
-                        <div className="text-[10px] text-slate-400">{new Date(p.paidAt).toLocaleDateString()}</div>
+                        <div className="text-xs text-slate-400">{new Date(p.paidAt).toLocaleDateString()}</div>
                       </div>
                     </div>
                   ))}
@@ -940,7 +940,7 @@ function RequestDetails() {
               {request.statusHistory?.map((h, idx) => (
                 <div key={idx} className="relative space-y-1">
                   <div className="absolute -left-[19px] top-1.5 h-2 w-2 rounded-full bg-violet-600 ring-4 ring-white" />
-                  <div className="flex justify-between text-[11px] text-slate-400">
+                  <div className="flex justify-between text-xs text-slate-400">
                     <span className="font-bold text-violet-600 uppercase tracking-wide">{h.newStatus.replace(/_/g, ' ')}</span>
                     <span>{formatDistanceToNow(new Date(h.createdAt), { addSuffix: true })}</span>
                   </div>

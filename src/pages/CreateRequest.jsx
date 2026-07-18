@@ -99,7 +99,7 @@ function CreateRequest() {
         <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 font-semibold transition-all">
           <ArrowLeft size={16} /> Back
         </button>
-        <span className="text-[10px] text-slate-400 font-mono uppercase tracking-wider">New Request</span>
+        <span className="text-xs text-slate-400 font-mono uppercase tracking-wider">New Request</span>
       </div>
 
       <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
@@ -123,8 +123,8 @@ function CreateRequest() {
             <input type="text" name="title" placeholder="e.g. Projector not displaying in Room 302" value={formData.title} onChange={handleInputChange}
               className={`w-full bg-slate-50 border rounded-xl py-3 px-4 text-slate-800 placeholder-slate-400 text-sm focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all ${errors.title ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500' : 'border-slate-200 focus:border-violet-500 focus:bg-white'}`} />
             <div className="flex justify-between mt-1">
-              {errors.title && <span className="text-[10px] text-rose-500 font-semibold flex items-center gap-1"><AlertTriangle size={10} />{errors.title}</span>}
-              <span className="text-[10px] text-slate-400 ml-auto">{formData.title.length}/{titleMaxLength}</span>
+              {errors.title && <span className="text-xs text-rose-500 font-semibold flex items-center gap-1"><AlertTriangle size={10} />{errors.title}</span>}
+              <span className="text-xs text-slate-400 ml-auto">{formData.title.length}/{titleMaxLength}</span>
             </div>
           </div>
 
@@ -142,8 +142,8 @@ function CreateRequest() {
                       : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                   }`}>
                   <span className="text-lg block mb-1">{cat.icon}</span>
-                  <span className="text-[10px] font-bold text-slate-700 block leading-tight">{cat.value}</span>
-                  <span className="text-[9px] text-slate-400 block mt-0.5">{cat.desc}</span>
+                  <span className="text-xs font-bold text-slate-700 block leading-tight">{cat.value}</span>
+                  <span className="text-[11px] text-slate-400 block mt-0.5">{cat.desc}</span>
                 </button>
               ))}
             </div>
@@ -157,7 +157,7 @@ function CreateRequest() {
               </label>
               <input type="text" name="location" placeholder="e.g. Main Block - Room 302" value={formData.location} onChange={handleInputChange}
                 className={`w-full bg-slate-50 border rounded-xl py-3 px-4 text-slate-800 placeholder-slate-400 text-sm focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all ${errors.location ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500' : 'border-slate-200 focus:border-violet-500 focus:bg-white'}`} />
-              {errors.location && <span className="text-[10px] text-rose-500 font-semibold mt-1 flex items-center gap-1"><AlertTriangle size={10} />{errors.location}</span>}
+              {errors.location && <span className="text-xs text-rose-500 font-semibold mt-1 flex items-center gap-1"><AlertTriangle size={10} />{errors.location}</span>}
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Asset Code</label>
@@ -176,7 +176,7 @@ function CreateRequest() {
                     formData.priority === p.value ? p.activeColor + ' border-transparent shadow-md' : p.color + ' hover:shadow-sm'
                   }`}>
                   <span className="text-xs font-bold block">{p.label}</span>
-                  <span className={`text-[9px] block mt-0.5 ${formData.priority === p.value ? 'text-white/80' : 'text-slate-400'}`}>{p.desc}</span>
+                  <span className={`text-[11px] block mt-0.5 ${formData.priority === p.value ? 'text-white/80' : 'text-slate-400'}`}>{p.desc}</span>
                 </button>
               ))}
             </div>
@@ -190,7 +190,7 @@ function CreateRequest() {
               </label>
               <input type="text" name="emergencyReason" placeholder="Why is this an emergency?" value={formData.emergencyReason} onChange={handleInputChange}
                 className={`w-full bg-rose-50 border rounded-xl py-3 px-4 text-rose-800 placeholder-rose-400 text-sm focus:outline-none focus:ring-1 focus:ring-rose-500 transition-all ${errors.emergencyReason ? 'border-rose-400' : 'border-rose-200 focus:border-rose-500'}`} />
-              {errors.emergencyReason && <span className="text-[10px] text-rose-500 font-semibold mt-1 flex items-center gap-1"><AlertTriangle size={10} />{errors.emergencyReason}</span>}
+              {errors.emergencyReason && <span className="text-xs text-rose-500 font-semibold mt-1 flex items-center gap-1"><AlertTriangle size={10} />{errors.emergencyReason}</span>}
             </div>
           )}
 
@@ -202,8 +202,8 @@ function CreateRequest() {
             <textarea name="description" rows={5} placeholder="Describe the issue in detail..." value={formData.description} onChange={handleInputChange}
               className={`w-full bg-slate-50 border rounded-xl py-3 px-4 text-slate-800 placeholder-slate-400 text-sm focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all resize-none ${errors.description ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500' : 'border-slate-200 focus:border-violet-500 focus:bg-white'}`} />
             <div className="flex justify-between mt-1">
-              {errors.description && <span className="text-[10px] text-rose-500 font-semibold flex items-center gap-1"><AlertTriangle size={10} />{errors.description}</span>}
-              <span className={`text-[10px] ml-auto ${formData.description.length > descMaxLength * 0.9 ? 'text-amber-500' : 'text-slate-400'}`}>
+              {errors.description && <span className="text-xs text-rose-500 font-semibold flex items-center gap-1"><AlertTriangle size={10} />{errors.description}</span>}
+              <span className={`text-xs ml-auto ${formData.description.length > descMaxLength * 0.9 ? 'text-amber-500' : 'text-slate-400'}`}>
                 {formData.description.length}/{descMaxLength}
               </span>
             </div>

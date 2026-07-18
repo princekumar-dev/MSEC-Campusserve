@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAlert } from '../components/AlertContext'
+import ModalShell from '../components/ModalShell'
 import apiClient from '../utils/apiClient'
 import { getAuthOrNull } from '../utils/auth'
 import { ShoppingCart, Plus, Search, ChevronRight, Clock, CheckCircle2, AlertCircle, Send, XCircle, RefreshCw, Package } from 'lucide-react'
@@ -60,8 +61,7 @@ function CreatePOModal({ onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm animate-fadeIn overflow-y-auto py-8">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 p-8 space-y-6">
+    <ModalShell panelClassName="max-w-3xl space-y-6 animate-fadeIn">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-black text-slate-800">Create Purchase Order</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl font-bold">×</button>
@@ -88,19 +88,19 @@ function CreatePOModal({ onClose, onSaved }) {
               {items.map((item, idx) => (
                 <div key={idx} className="grid grid-cols-1 sm:grid-cols-6 gap-2 p-4 bg-slate-50 rounded-xl border border-slate-100">
                   <div className="sm:col-span-2">
-                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Description *</label>
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Description *</label>
                     <input type="text" value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)} placeholder="Item name..." className="w-full mt-1 bg-white border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:border-violet-500" />
                   </div>
                   <div>
-                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Qty *</label>
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Qty *</label>
                     <input type="number" value={item.quantityOrdered} onChange={e => updateItem(idx, 'quantityOrdered', e.target.value)} min="1" className="w-full mt-1 bg-white border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:border-violet-500" />
                   </div>
                   <div>
-                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Unit</label>
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Unit</label>
                     <input type="text" value={item.unit} onChange={e => updateItem(idx, 'unit', e.target.value)} placeholder="pcs" className="w-full mt-1 bg-white border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:border-violet-500" />
                   </div>
                   <div>
-                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Price (₹) *</label>
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Price (₹) *</label>
                     <input type="number" value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', e.target.value)} min="0" className="w-full mt-1 bg-white border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:border-violet-500" />
                   </div>
                   <div className="flex items-end">
@@ -118,7 +118,7 @@ function CreatePOModal({ onClose, onSaved }) {
             <div className="text-violet-700 text-base font-black">Grand Total: ₹{totals.grandTotal.toFixed(2)}</div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">Delivery Address *</label>
               <input type="text" value={form.deliveryAddress} onChange={e => setForm(p => ({ ...p, deliveryAddress: e.target.value }))} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-violet-500 transition-all" />
@@ -136,8 +136,7 @@ function CreatePOModal({ onClose, onSaved }) {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </ModalShell>
   )
 }
 
@@ -200,7 +199,7 @@ export default function PurchaseOrders() {
             <button key={s} onClick={() => setStatusFilter(s)}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${statusFilter === s ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
               {s === 'ALL' ? 'All' : (statusConfig[s]?.label || s)}
-              {s !== 'ALL' && <span className="ml-1.5 text-[9px] opacity-70">{pos.filter(p => p.status === s).length}</span>}
+              {s !== 'ALL' && <span className="ml-1.5 text-[11px] opacity-70">{pos.filter(p => p.status === s).length}</span>}
             </button>
           ))}
         </div>
@@ -240,7 +239,7 @@ export default function PurchaseOrders() {
                       {po.expectedDeliveryDate ? new Date(po.expectedDeliveryDate).toLocaleDateString('en-IN') : '—'}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusConfig[po.status]?.color || 'bg-slate-100 text-slate-500'}`}>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${statusConfig[po.status]?.color || 'bg-slate-100 text-slate-500'}`}>
                         {statusConfig[po.status]?.label || po.status}
                       </span>
                     </td>

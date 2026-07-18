@@ -68,7 +68,7 @@ export default function ReceivingDashboard() {
                   <div className="font-mono text-xs text-violet-600 font-bold">{d.deliveryNumber}</div>
                   <div className="text-xs text-slate-600">{d.vendorName} · {d.poNumber}</div>
                 </div>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${d.status === 'ENTRY_APPROVED' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${d.status === 'ENTRY_APPROVED' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
                   {d.status?.replace(/_/g, ' ')}
                 </span>
               </div>

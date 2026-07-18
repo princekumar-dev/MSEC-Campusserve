@@ -72,10 +72,10 @@ export default function GateDashboard() {
                   {entry.decision === 'APPROVED' ? <CheckCircle size={14} className="text-emerald-600" /> : <XCircle size={14} className="text-rose-600" />}
                   <div>
                     <div className="text-xs font-bold text-slate-800">{entry.poNumber || 'Unknown'}</div>
-                    <div className="text-[10px] text-slate-500">{entry.actualDeliveryPersonName} · {entry.actualVehicleNumber}</div>
+                    <div className="text-xs text-slate-500">{entry.actualDeliveryPersonName} · {entry.actualVehicleNumber}</div>
                   </div>
                 </div>
-                <div className="text-[10px] text-slate-400">{new Date(entry.entryTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
+                <div className="text-xs text-slate-400">{new Date(entry.entryTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
               </div>
             ))}
           </div>
