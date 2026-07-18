@@ -5,6 +5,7 @@ import Header from './components/Header'
 import BottomNav from './components/BottomNav'
 import { AlertProvider } from './components/AlertContext'
 import { getAuthOrNull } from './utils/auth'
+import GlobalExecutionLoader from './components/GlobalExecutionLoader'
 
 const clearStoredAuth = () => {
   try {
@@ -184,8 +185,11 @@ function AppContent() {
           <main className="flex w-full flex-1 justify-center">
             <div className={`layout-content-container flex w-full max-w-7xl flex-col px-4 py-6 page-enter ${!isAuthPage ? 'pb-24 md:pb-6' : ''}`}>
               <Suspense fallback={
-                <div className="flex items-center justify-center min-h-[50vh]">
-                  <div className="premium-spinner"></div>
+                <div className="flex items-center justify-center min-h-[60vh]">
+                  <div className="bg-white rounded-2xl shadow-lg px-10 py-10 flex flex-col items-center gap-4">
+                    <div className="w-10 h-10 border-2 border-violet-100 border-t-violet-500 rounded-full animate-spin"></div>
+                    <p className="text-gray-500 text-sm font-medium">Loading dashboard...</p>
+                  </div>
                 </div>
               }>
                 <Routes>
@@ -266,6 +270,7 @@ function App() {
     <ErrorBoundary>
       <AlertProvider>
         <BrowserRouter>
+          <GlobalExecutionLoader />
           <AppContent />
         </BrowserRouter>
       </AlertProvider>
