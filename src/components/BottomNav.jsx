@@ -26,7 +26,7 @@ function BottomNav() {
           <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-400 rounded-full border border-slate-950" />
         )}
       </div>
-      <span className={`text-[8px] font-semibold transition-all ${
+      <span className={`text-[10px] font-semibold transition-all ${
         isActive ? 'text-violet-400' : 'text-slate-500 group-hover:text-slate-300'
       }`}>
         {label}

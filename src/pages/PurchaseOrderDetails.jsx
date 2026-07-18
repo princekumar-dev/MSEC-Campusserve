@@ -35,7 +35,7 @@ function StatusTimeline({ currentStatus }) {
         {poSteps.map((step, idx) => (
           <div key={step} className="flex items-center flex-1">
             <div className={`flex flex-col items-center flex-1 ${idx < poSteps.length - 1 ? 'relative' : ''}`}>
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black transition-all ${
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black transition-all ${
                 isTerminal ? 'bg-rose-100 text-rose-600 border-2 border-rose-300' :
                 idx < currentStep ? 'bg-violet-600 text-white' :
                 idx === currentStep ? 'bg-violet-600 text-white ring-2 ring-violet-300 ring-offset-1 scale-110' :
@@ -43,7 +43,7 @@ function StatusTimeline({ currentStatus }) {
               }`}>
                 {isTerminal ? '×' : idx < currentStep ? '✓' : idx + 1}
               </div>
-              <span className={`text-[8px] mt-1 font-bold text-center w-full leading-tight ${idx <= currentStep && !isTerminal ? 'text-violet-700' : 'text-slate-400'}`}>
+              <span className={`text-[11px] mt-1 font-bold text-center w-full leading-tight ${idx <= currentStep && !isTerminal ? 'text-violet-700' : 'text-slate-400'}`}>
                 {step}
               </span>
               {idx < poSteps.length - 1 && (
@@ -243,7 +243,7 @@ export default function PurchaseOrderDetails() {
                         <div className="mt-2 h-1.5 bg-slate-100 rounded-full w-32">
                           <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${Math.min(progress, 100)}%` }} />
                         </div>
-                        <div className="text-[9px] text-slate-400 mt-0.5">{progress.toFixed(0)}% received</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">{progress.toFixed(0)}% received</div>
                       </td>
                       <td className="px-6 py-4 text-right text-slate-600">{item.quantityOrdered} {item.unit}</td>
                       <td className="px-6 py-4 text-right text-emerald-600 font-semibold">{item.quantityAccepted || 0}</td>
@@ -272,10 +272,10 @@ export default function PurchaseOrderDetails() {
                 <div className="pb-4 flex-1">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-slate-800">{entry.newStatus?.replace(/_/g, ' ')}</span>
-                    <span className="text-[10px] text-slate-400">{new Date(entry.createdAt).toLocaleString('en-IN')}</span>
+                    <span className="text-xs text-slate-400">{new Date(entry.createdAt).toLocaleString('en-IN')}</span>
                   </div>
                   {entry.comment && <p className="text-xs text-slate-500 mt-0.5">{entry.comment}</p>}
-                  <p className="text-[10px] text-slate-400 mt-0.5">by {entry.actorName}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">by {entry.actorName}</p>
                 </div>
               </div>
             ))}

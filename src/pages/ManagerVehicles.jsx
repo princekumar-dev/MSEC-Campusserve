@@ -38,7 +38,7 @@ export default function ManagerVehicles() {
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-400 uppercase tracking-wider">
                   <th className="px-5 py-3">Vehicle Number</th>
                   <th className="px-5 py-3">Type</th>
                   <th className="px-5 py-3">Status</th>
@@ -50,7 +50,7 @@ export default function ManagerVehicles() {
                     <td className="px-5 py-4 font-mono text-xs font-bold text-violet-600">{v.vehicleNumber}</td>
                     <td className="px-5 py-4 text-xs text-slate-600">{v.vehicleType}</td>
                     <td className="px-5 py-4">
-                      <span className={`flex items-center gap-1 text-[10px] font-bold ${v.status === 'ACTIVE' ? 'text-emerald-600' : 'text-slate-400'}`}>
+                      <span className={`flex items-center gap-1 text-xs font-bold ${v.status === 'ACTIVE' ? 'text-emerald-600' : 'text-slate-400'}`}>
                         {v.status === 'ACTIVE' ? <CheckCircle size={12} /> : <XCircle size={12} />}
                         {v.status}
                       </span>

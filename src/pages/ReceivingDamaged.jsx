@@ -50,7 +50,7 @@ export default function ReceivingDamaged() {
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-400 uppercase tracking-wider">
                   <th className="px-5 py-3">Item</th>
                   <th className="px-5 py-3">GRN</th>
                   <th className="px-5 py-3">PO</th>

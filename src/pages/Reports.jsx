@@ -63,7 +63,7 @@ function Reports() {
           <div>
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Total Expenditure</span>
             <span className="text-2xl font-black text-slate-800 mt-2 block">₹{stats.totalExpenses.toFixed(2)}</span>
-            <span className="text-[10px] text-slate-500 mt-1 block">Cleared payments</span>
+            <span className="text-xs text-slate-500 mt-1 block">Cleared payments</span>
           </div>
           <div className="p-4 bg-emerald-50 rounded-xl text-emerald-600">
             <Landmark size={24} />
@@ -74,7 +74,7 @@ function Reports() {
           <div>
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Approved Budget</span>
             <span className="text-2xl font-black text-slate-800 mt-2 block">₹{stats.totalQuotations.toFixed(2)}</span>
-            <span className="text-[10px] text-slate-500 mt-1 block">Estimated quotation totals</span>
+            <span className="text-xs text-slate-500 mt-1 block">Estimated quotation totals</span>
           </div>
           <div className="p-4 bg-violet-50 rounded-xl text-violet-600">
             <TrendingUp size={24} />
@@ -87,7 +87,7 @@ function Reports() {
             <span className="text-2xl font-black text-slate-800 mt-2 block">
               {stats.totalRequests > 0 ? Math.round((stats.closed / stats.totalRequests) * 100) : 0}%
             </span>
-            <span className="text-[10px] text-slate-500 mt-1 block">{stats.closed} resolved of {stats.totalRequests}</span>
+            <span className="text-xs text-slate-500 mt-1 block">{stats.closed} resolved of {stats.totalRequests}</span>
           </div>
           <div className="p-4 bg-indigo-50 rounded-xl text-indigo-650">
             <ShieldCheck size={24} />

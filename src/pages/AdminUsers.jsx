@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAlert } from '../components/AlertContext'
+import ModalShell from '../components/ModalShell'
 import apiClient from '../utils/apiClient'
 import { getAuthOrNull } from '../utils/auth'
 import { Users, Plus, Trash2, Shield, Mail, Phone, Building2, Search } from 'lucide-react'
@@ -151,7 +152,7 @@ function AdminUsers() {
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-600">{user.email}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${roleColors[user.role] || 'bg-slate-100 text-slate-600'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ${roleColors[user.role] || 'bg-slate-100 text-slate-600'}`}>
                       {user.role}
                     </span>
                   </td>
@@ -175,8 +176,7 @@ function AdminUsers() {
       </div>
 
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <ModalShell panelClassName="max-w-md">
             <h2 className="text-xl font-bold text-slate-900 mb-4">Create New User</h2>
             <div className="space-y-3">
               <input type="text" placeholder="Full Name" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-violet-500" />
@@ -199,8 +199,7 @@ function AdminUsers() {
                 {creating ? 'Creating...' : 'Create User'}
               </button>
             </div>
-          </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   )

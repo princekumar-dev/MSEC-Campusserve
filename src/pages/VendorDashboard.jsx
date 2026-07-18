@@ -77,7 +77,7 @@ export default function VendorDashboard() {
                   <div className="font-mono text-xs text-violet-600 font-bold">{po.poNumber}</div>
                   <div className="text-xs text-slate-600 mt-0.5">{po.vendorName}</div>
                 </div>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${po.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${po.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
                   {po.status?.replace(/_/g, ' ')}
                 </span>
               </Link>

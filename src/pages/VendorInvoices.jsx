@@ -58,7 +58,7 @@ export default function VendorInvoices() {
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-400 uppercase tracking-wider">
                   <th className="px-5 py-3">Invoice #</th>
                   <th className="px-5 py-3">PO Number</th>
                   <th className="px-5 py-3">Amount</th>
@@ -73,7 +73,7 @@ export default function VendorInvoices() {
                     <td className="px-5 py-4 text-xs text-slate-600">{inv.poNumber || '—'}</td>
                     <td className="px-5 py-4 text-sm font-bold text-slate-800">₹{(inv.grandTotal || 0).toLocaleString('en-IN')}</td>
                     <td className="px-5 py-4">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusColors[inv.status] || 'bg-slate-100 text-slate-600'}`}>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${statusColors[inv.status] || 'bg-slate-100 text-slate-600'}`}>
                         {inv.status?.replace(/_/g, ' ')}
                       </span>
                     </td>

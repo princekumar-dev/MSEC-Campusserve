@@ -150,7 +150,7 @@ function Requests() {
           >
             {f.label}
             {statusCounts[f.value] !== undefined && (
-              <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
                 selectedStatus === f.value ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
               }`}>
                 {statusCounts[f.value]}
@@ -208,13 +208,13 @@ function Requests() {
         {showFilters && (
           <div className="px-4 pb-4 pt-0 border-t border-slate-100">
             <div className="flex items-center gap-3 mt-3">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Priority</span>
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Priority</span>
               <div className="flex gap-1.5">
                 {['ALL', 'EMERGENCY', 'HIGH', 'MEDIUM', 'LOW'].map(p => (
                   <button
                     key={p}
                     onClick={() => { setSelectedPriority(p); setCurrentPage(1) }}
-                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${
+                    className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all ${
                       selectedPriority === p
                         ? p === 'EMERGENCY' ? 'bg-rose-500 text-white' :
                           p === 'HIGH' ? 'bg-amber-500 text-white' :
@@ -273,7 +273,7 @@ function Requests() {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50">
+                  <tr className="border-b border-slate-200 text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50">
                     <th className="py-3 px-6">Number</th>
                     <th className="py-3 px-2">Subject</th>
                     <th className="py-3 px-2 hidden lg:table-cell">Location</th>
@@ -288,18 +288,18 @@ function Requests() {
                   {paginatedRequests.map((req) => (
                     <tr key={req._id} className={`table-row-hover border-l-3 ${getPriorityBorder(req.priority)}`}>
                       <td className="py-4 px-6">
-                        <span className="font-mono text-[11px] text-violet-600 font-bold">{req.requestNumber}</span>
+                        <span className="font-mono text-xs text-violet-600 font-bold">{req.requestNumber}</span>
                       </td>
                       <td className="py-4 px-2">
                         <div className="font-semibold text-slate-800 text-xs">{req.title}</div>
-                        <span className="text-[9px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded mt-1 inline-block capitalize border border-slate-100">{req.category}</span>
+                        <span className="text-xs text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded mt-1 inline-block capitalize border border-slate-100">{req.category}</span>
                       </td>
                       <td className="py-4 px-2 hidden lg:table-cell text-slate-500 text-xs">{req.location}</td>
                       <td className="py-4 px-2 hidden sm:table-cell">
                         <div className="text-xs font-semibold text-slate-700">{req.requesterName}</div>
                       </td>
                       <td className="py-4 px-2">
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
                           req.priority === 'EMERGENCY' ? 'bg-rose-100 text-rose-700' :
                           req.priority === 'HIGH' ? 'bg-amber-100 text-amber-700' :
                           req.priority === 'MEDIUM' ? 'bg-blue-100 text-blue-700' :
@@ -313,13 +313,13 @@ function Requests() {
                           {req.status.replace(/_/g, ' ')}
                         </span>
                       </td>
-                      <td className="py-4 px-2 hidden md:table-cell text-[10px] text-slate-400">
+                      <td className="py-4 px-2 hidden md:table-cell text-xs text-slate-400">
                         {req.updatedAt ? formatDistanceToNow(new Date(req.updatedAt), { addSuffix: true }) : '—'}
                       </td>
                       <td className="py-4 px-6 text-right">
                         <Link
                           to={`/requests/${req._id}`}
-                          className="inline-flex items-center gap-1 bg-violet-600 hover:bg-violet-700 text-white font-bold text-[10px] py-1.5 px-3 rounded-lg shadow-sm transition-all group"
+                          className="inline-flex items-center gap-1 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs py-1.5 px-3 rounded-lg shadow-sm transition-all group"
                         >
                           View <ArrowRight size={10} className="group-hover:translate-x-0.5 transition-transform" />
                         </Link>
@@ -333,7 +333,7 @@ function Requests() {
             {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100">
-                <span className="text-[10px] text-slate-400 font-semibold">
+                <span className="text-xs text-slate-400 font-semibold">
                   Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredRequests.length)} of {filteredRequests.length}
                 </span>
                 <div className="flex items-center gap-1">
@@ -354,7 +354,7 @@ function Requests() {
                       <button
                         key={page}
                         onClick={() => setCurrentPage(page)}
-                        className={`w-7 h-7 rounded-lg text-[11px] font-bold transition-all ${
+                        className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${
                           currentPage === page
                             ? 'bg-violet-600 text-white shadow-sm'
                             : 'text-slate-500 hover:bg-slate-50'

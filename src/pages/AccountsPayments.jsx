@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAlert } from '../components/AlertContext'
+import ModalShell from '../components/ModalShell'
 import apiClient from '../utils/apiClient'
 import { IndianRupee, Plus, Search, CheckCircle, Clock } from 'lucide-react'
 
@@ -20,8 +21,7 @@ function RecordPaymentModal({ onClose, onSaved, invoice }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-8 space-y-5">
+    <ModalShell panelClassName="max-w-md space-y-5 animate-fadeIn">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-black text-slate-800">Record Payment</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl font-bold">×</button>
@@ -65,8 +65,7 @@ function RecordPaymentModal({ onClose, onSaved, invoice }) {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </ModalShell>
   )
 }
 
@@ -122,7 +121,7 @@ export default function AccountsPayments() {
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-400 uppercase tracking-wider">
                   <th className="px-5 py-3">Payment #</th>
                   <th className="px-5 py-3">Amount</th>
                   <th className="px-5 py-3">Method</th>

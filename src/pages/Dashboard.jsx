@@ -198,9 +198,9 @@ function Dashboard() {
         <div className="dashboard-hero-content">
           <div className="hero-time-pill">
             <span className="h-1.5 w-1.5 bg-emerald-400 rounded-full animate-pulse" />
-            <span className="text-white/80 text-[11px] font-semibold">{getTimeString()}</span>
+            <span className="text-white/80 text-xs font-semibold">{getTimeString()}</span>
             <span className="text-white/40">|</span>
-            <span className="text-white/80 text-[11px] font-semibold">{getDateString()}</span>
+            <span className="text-white/80 text-xs font-semibold">{getDateString()}</span>
           </div>
 
           <h1 className="hero-greeting">{getGreeting()}</h1>
@@ -215,7 +215,7 @@ function Dashboard() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="bg-transparent border-none text-slate-800 placeholder-slate-500 text-sm px-3 py-2 w-full focus:outline-none"
             />
-            <button type="submit" className="btn-premium py-2.5 px-6 rounded-full flex-shrink-0 text-xs">
+            <button type="submit" className="btn-premium py-2.5 px-6 rounded-full flex-shrink-0 text-sm">
               Search
             </button>
           </form>
@@ -262,7 +262,7 @@ function Dashboard() {
             </ResponsiveContainer>
             <div className="flex flex-wrap gap-2 mt-3">
               {pieData.slice(0, 5).map((entry, idx) => (
-                <div key={idx} className="flex items-center gap-1.5 text-[10px] text-slate-600">
+                <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-600">
                   <span className="w-2 h-2 rounded-full" style={{ background: entry.color }} />
                   {entry.name} ({entry.value})
                 </div>
@@ -278,14 +278,14 @@ function Dashboard() {
         <GlassPanel className="lg:col-span-2">
           <div className="flex justify-between items-center mb-5">
             <h2 className="section-title">Recent Requests</h2>
-            <Link to="/requests" className="text-xs font-bold text-violet-600 hover:text-violet-700 transition-all flex items-center gap-1">
+            <Link to="/requests" className="text-sm font-bold text-violet-600 hover:text-violet-700 transition-all flex items-center gap-1">
               View All <ChevronRight size={12} />
             </Link>
           </div>
           <div className="overflow-x-auto premium-table">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <tr className="border-b border-slate-200 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                   <th className="pb-3">Number</th>
                   <th className="pb-3">Subject</th>
                   <th className="pb-3">Priority</th>
@@ -304,9 +304,9 @@ function Dashboard() {
                   recentRequests.map((req) => (
                     <tr key={req._id} className="table-row-hover">
                       <td className="py-3.5 font-mono text-xs text-violet-600 font-bold">{req.requestNumber}</td>
-                      <td className="py-3.5 font-semibold text-slate-800 text-xs">{req.title}</td>
+                      <td className="py-3.5 font-semibold text-slate-800 text-sm">{req.title}</td>
                       <td className="py-3.5">
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
                           req.priority === 'EMERGENCY' ? 'bg-rose-100 text-rose-700' :
                           req.priority === 'HIGH' ? 'bg-amber-100 text-amber-700' :
                           req.priority === 'MEDIUM' ? 'bg-blue-100 text-blue-700' :
@@ -321,7 +321,7 @@ function Dashboard() {
                         </span>
                       </td>
                       <td className="py-3.5 text-right">
-                        <Link to={`/requests/${req._id}`} className="inline-flex items-center gap-1 bg-violet-600 hover:bg-violet-700 text-white font-bold text-[10px] py-1.5 px-3 rounded-lg shadow-sm transition-all">
+                        <Link to={`/requests/${req._id}`} className="inline-flex items-center gap-1 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs py-1.5 px-3 rounded-lg shadow-sm transition-all">
                           <Eye size={10} /> View
                         </Link>
                       </td>
@@ -350,8 +350,8 @@ function Dashboard() {
                   {idx < 5 && <div className="absolute top-8 left-1/2 -translate-x-1/2 w-px h-4 bg-slate-200" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-slate-700 truncate">{req.title}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
+                  <p className="text-sm font-semibold text-slate-700 truncate">{req.title}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
                     {req.status.replace(/_/g, ' ')} · {req.updatedAt ? formatDistanceToNow(new Date(req.updatedAt), { addSuffix: true }) : 'recently'}
                   </p>
                 </div>
@@ -363,7 +363,7 @@ function Dashboard() {
             {recentRequests.length === 0 && (
               <div className="text-center py-6 text-slate-400">
                 <Clock size={20} className="mx-auto mb-2 opacity-50" />
-                <p className="text-xs">No activity yet</p>
+                <p className="text-sm">No activity yet</p>
               </div>
             )}
           </div>

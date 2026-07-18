@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAlert } from '../components/AlertContext'
+import ModalShell from '../components/ModalShell'
 import apiClient from '../utils/apiClient'
 import { getAuthOrNull } from '../utils/auth'
 import { ClipboardCheck, Plus, Package, CheckCircle, AlertTriangle, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
@@ -66,8 +67,7 @@ function CreateGRNModal({ onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm animate-fadeIn overflow-y-auto py-8">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 p-8 space-y-6">
+    <ModalShell panelClassName="max-w-2xl space-y-6 animate-fadeIn">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-black text-slate-800">Record Goods Receipt (GRN)</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl font-bold">×</button>
@@ -95,7 +95,7 @@ function CreateGRNModal({ onClose, onSaved }) {
           {items.length > 0 && (
             <div>
               <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Receiving Quantities</label>
-              <p className="text-[10px] text-slate-400 mb-3">Rule: Accepted + Damaged + Rejected ≤ Delivered. Cumulative Accepted ≤ Ordered.</p>
+              <p className="text-xs text-slate-400 mb-3">Rule: Accepted + Damaged + Rejected ≤ Delivered. Cumulative Accepted ≤ Ordered.</p>
               <div className="space-y-3">
                 {items.map((item, idx) => {
                   const remaining = item.quantityOrdered - item.quantityPreviouslyAccepted
@@ -117,7 +117,7 @@ function CreateGRNModal({ onClose, onSaved }) {
                           { field: 'quantityRejected', label: 'Rejected', color: 'text-rose-600' },
                         ].map(({ field, label, color }) => (
                           <div key={field}>
-                            <label className={`text-[9px] font-bold uppercase tracking-wider ${color} mb-1 block`}>{label}</label>
+                            <label className={`text-[11px] font-bold uppercase tracking-wider ${color} mb-1 block`}>{label}</label>
                             <input
                               type="number" min="0" value={item[field]}
                               onChange={e => updateItem(idx, field, e.target.value)}
@@ -145,8 +145,7 @@ function CreateGRNModal({ onClose, onSaved }) {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </ModalShell>
   )
 }
 
@@ -166,8 +165,8 @@ function GRNCard({ grn }) {
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${grnTypeColors[grn.grnType]}`}>{grn.grnType}</span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${grn.status === 'FINALIZED' ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>{grn.status}</span>
+            <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${grnTypeColors[grn.grnType]}`}>{grn.grnType}</span>
+            <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${grn.status === 'FINALIZED' ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>{grn.status}</span>
           </div>
         </div>
 
@@ -184,7 +183,7 @@ function GRNCard({ grn }) {
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead>
-                <tr className="text-[9px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                <tr className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
                   <th className="pb-2">Item</th>
                   <th className="pb-2 text-right">Delivered</th>
                   <th className="pb-2 text-right text-emerald-600">Accepted</th>
@@ -263,7 +262,7 @@ export default function GRN() {
         ].map(({ type, label, value, color }) => (
           <button key={type} onClick={() => setFilter(type)}
             className={`p-4 rounded-xl border-2 text-left transition-all ${filter === type ? 'border-violet-400 shadow-sm' : 'border-slate-200'} bg-white`}>
-            <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">{label}</div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</div>
             <div className={`text-2xl font-black mt-1 ${filter === type ? 'text-violet-700' : 'text-slate-800'}`}>{value}</div>
           </button>
         ))}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAlert } from '../components/AlertContext'
+import ModalShell from '../components/ModalShell'
 import apiClient from '../utils/apiClient'
 import { getAuthOrNull } from '../utils/auth'
 import { Truck, Plus, Calendar, Clock, QrCode, CheckCircle, AlertCircle, Send, RefreshCw, Package } from 'lucide-react'
@@ -45,8 +46,7 @@ function ScheduleDeliveryModal({ onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn overflow-y-auto py-8">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-8 space-y-5">
+    <ModalShell panelClassName="max-w-lg space-y-5 animate-fadeIn">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-black text-slate-800">Schedule Delivery</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl font-bold">×</button>
@@ -111,8 +111,7 @@ function ScheduleDeliveryModal({ onClose, onSaved }) {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </ModalShell>
   )
 }
 
@@ -212,7 +211,7 @@ export default function Deliveries() {
                       </div>
                     )}
                   </div>
-                  <span className={`text-[10px] font-bold px-2 py-1 rounded-full border flex-shrink-0 ${statusColors[delivery.status] || 'bg-slate-100 text-slate-500'}`}>
+                  <span className={`text-xs font-bold px-2 py-1 rounded-full border flex-shrink-0 ${statusColors[delivery.status] || 'bg-slate-100 text-slate-500'}`}>
                     {delivery.status?.replace(/_/g, ' ')}
                   </span>
                 </div>
@@ -235,7 +234,7 @@ export default function Deliveries() {
                       <span className="font-bold">Pass Active</span>
                       <span className="text-violet-500">Backup Code: <strong className="font-mono">{delivery.backupCode}</strong></span>
                     </div>
-                    <span className="text-[9px] text-violet-500">Valid until {new Date(delivery.passValidUntil).toLocaleDateString('en-IN')}</span>
+                    <span className="text-[11px] text-violet-500">Valid until {new Date(delivery.passValidUntil).toLocaleDateString('en-IN')}</span>
                   </div>
                 </div>
               )}
