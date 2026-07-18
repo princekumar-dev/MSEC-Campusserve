@@ -46,7 +46,7 @@ export default function SWControls() {
       localStorage.removeItem('userEmail');
       showSuccess('Local Storage', 'Selected localStorage keys cleared');
       // Notify other clients via storage event + service worker reload
-      try { localStorage.setItem('msec:reload_signal', Date.now()); } catch (e) {}
+      try { localStorage.setItem('campusserve:reload_signal', Date.now()); } catch (e) {}
       broadcastReload();
     } catch (e) {
       showError('Local Storage', String(e));

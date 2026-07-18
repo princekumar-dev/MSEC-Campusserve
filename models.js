@@ -1,226 +1,23 @@
 import mongoose from 'mongoose'
 
-// User Schema for CampusServe & MSEC Academics
+// User Schema for CampusServe Pro
 const UserSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   role: { 
     type: String, 
-    enum: ['admin', 'staff', 'hod', 'requester', 'manager', 'technician', 'accounts', 'vendor', 'super_admin'], 
+    enum: ['admin', 'requester', 'manager', 'technician', 'accounts', 'vendor', 'super_admin', 'gate', 'receiving_officer', 'delivery_person', 'hod', 'staff'], 
     required: true 
   },
   name: { type: String, required: true },
-  department: { type: String, required: true }, // e.g. 'CSE', 'ECE', 'MECH', 'ADMIN', 'MAINTENANCE', etc.
-  year: { type: String }, // For staff - which year they handle (I, II, III, IV, etc.)
-  section: { type: String }, // For staff - which section they handle (A, B, C, etc.)
+  department: { type: String, required: true },
   phoneNumber: { type: String },
-  eSignature: { type: String }, // Base64 encoded signature image
+  eSignature: { type: String },
   isActive: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now }
 })
 
-// Student Schema
-const StudentSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  regNumber: { type: String, required: true, unique: true },
-  year: { type: String, required: true },
-  section: { type: String, required: true },
-  department: { type: String, enum: ['CSE', 'AI_DS', 'ECE', 'MECH', 'CIVIL', 'EEE', 'IT', 'HNS', 'ADMIN'], required: true },
-  studentPhoneNumber: { type: String },
-  studentPasswordHash: { type: String },
-  parentPhoneNumber: { type: String, required: true },
-  attendance: { type: String },
-  // Optional fields populated from import sessions
-  examinationName: { type: String },
-  examinationDate: { type: Date },
-  createdAt: { type: Date, default: Date.now }
-})
-
-// Marksheet Schema
-const MarksheetSchema = new mongoose.Schema({
-  marksheetId: { type: String, unique: true },
-  studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', required: true },
-  studentDetails: {
-    name: String,
-    regNumber: String,
-    year: String,
-    section: String,
-    department: String,
-    studentPhoneNumber: String,
-    parentPhoneNumber: String,
-    attendance: String,
-    examinationName: String,
-    examinationDate: Date
-  },
-  // Top-level examination fields
-  examinationName: { type: String },
-  examinationDate: { type: Date, required: true },
-  semester: { type: String }, // Add semester field
-  subjects: [{
-    subjectName: { type: String, required: true },
-    subjectCode: { type: String },
-    marks: { type: Number },
-    result: { type: String, enum: ['Pass', 'Fail', 'Absent'], required: true }
-  }],
-  overallResult: { type: String, enum: ['Pass', 'Fail', 'Absent'] },
-  staffId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  staffName: { type: String, required: true },
-  staffSignature: { type: String }, // Base64 encoded signature
-  hodId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  hodName: { type: String },
-  hodSignature: { type: String }, // Base64 encoded signature
-  principalSignature: { type: String }, // Base64 encoded signature
-  status: {
-    type: String,
-    enum: ['draft', 'verified_by_staff', 'dispatch_requested', 'rescheduled_by_hod', 'approved_by_hod', 'rejected_by_hod', 'dispatched'],
-    default: 'draft'
-  },
-  dispatchRequest: {
-    requestedAt: Date,
-    requestedBy: String,
-    hodResponse: String, // 'approved', 'rejected', 'rescheduled'
-    hodComments: String,
-    scheduledDispatchDate: Date,
-    respondedAt: Date,
-    preDispatchNotificationSent: { type: Boolean, default: false },
-    autoDispatched: { type: Boolean, default: false },
-    autoDispatchFailed: { type: Boolean, default: false },
-    dispatchError: String,
-    status: { type: String, enum: ['pending', 'approved', 'rejected', 'rescheduled', 'dispatched'], default: 'pending' },
-    dispatchedAt: Date
-  },
-  dispatchStatus: {
-    dispatched: { type: Boolean, default: false },
-    dispatchedAt: Date,
-    whatsappStatus: { type: String, enum: ['pending', 'sent', 'failed'], default: 'pending' },
-    whatsappError: String
-  },
-  // Track whether a staff (or reviewer) has "visited" this marksheet UI
-  visited: { type: Boolean, default: false },
-  visitedAt: { type: Date },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-})
-
-// Add compound indexes for query performance
-MarksheetSchema.index({ staffId: 1, status: 1, createdAt: -1 })
-MarksheetSchema.index({ 'studentDetails.department': 1, status: 1, createdAt: -1 })
-MarksheetSchema.index({ 'studentDetails.year': 1, 'studentDetails.department': 1, createdAt: -1 })
-MarksheetSchema.index({ status: 1, createdAt: -1 })
-MarksheetSchema.index({ studentId: 1, createdAt: -1 })
-MarksheetSchema.index({ 'studentDetails.regNumber': 1 })
-MarksheetSchema.index({ 'dispatchStatus.dispatched': 1, createdAt: -1 })
-
-// Excel Import Session Schema - for temporary storage during import
-const ImportSessionSchema = new mongoose.Schema({
-  sessionId: { type: String, unique: true },
-  staffId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  department: { type: String, required: true },
-  year: { type: String, required: true },
-  semester: { type: String },
-  examinationName: { type: String },
-  examinationDate: { type: Date, required: true },
-  studentsData: [{
-    name: String,
-    regNumber: String,
-    year: String,
-    section: String,
-    studentPhoneNumber: String,
-    parentPhoneNumber: String,
-    attendance: String,
-    examinationName: String,
-    examinationDate: Date,
-    subjects: [{
-      subjectName: String,
-      subjectCode: String,
-      marks: Number,
-      result: { type: String, enum: ['Pass', 'Fail', 'Absent'] }
-    }]
-  }],
-  status: { type: String, enum: ['pending', 'processed', 'error'], default: 'pending' },
-  errorMessages: [String],
-  createdAt: { type: Date, default: Date.now, expires: '24h' } // Auto-delete after 24 hours
-})
-
-// Leave/Late Request Schema
-const LeaveRequestSchema = new mongoose.Schema({
-  type: { type: String, enum: ['leave', 'late'], required: true },
-  studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', required: true },
-  studentDetails: {
-    name: String,
-    regNumber: String,
-    year: String,
-    section: String,
-    department: String,
-    parentPhoneNumber: String
-  },
-  reason: { type: String, required: true },
-  attachmentData: { type: String }, // Base64 encoded proof image
-  startDate: { type: Date },
-  endDate: { type: Date },
-  expectedArrivalTime: { type: Date },
-  recordedAt: { type: Date }, // When staff clicked "Record" button
-  arrivalConfirmedAt: { type: Date }, // When student clicked "Reached" button
-  arrivalRecordedAt: { type: Date }, // Legacy field
-  status: { type: String, enum: ['requested', 'waiting_for_arrival_confirmation', 'approved_by_hod', 'rejected_by_hod', 'acknowledged_by_staff'], default: 'requested' },
-  hodId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  hodName: { type: String },
-  hodSignature: { type: String },
-  staffId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  staffName: { type: String },
-  approvedAt: { type: Date },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-})
-
-LeaveRequestSchema.index({ 'studentDetails.department': 1, type: 1, status: 1, createdAt: -1 })
-LeaveRequestSchema.index({ 'studentDetails.department': 1, 'studentDetails.year': 1, 'studentDetails.section': 1, type: 1, status: 1, createdAt: -1 })
-LeaveRequestSchema.index({ studentId: 1, type: 1, createdAt: -1 })
-
-// Staff Approval Request Schema - for pending staff account approvals from HOD
-const StaffApprovalRequestSchema = new mongoose.Schema({
-  email: { type: String, required: true },
-  name: { type: String, required: true },
-  password: { type: String, required: true }, // Will be hashed and stored temporarily
-  department: {
-    type: String,
-    enum: ['CSE', 'AI_DS', 'ECE', 'MECH', 'CIVIL', 'EEE', 'IT', 'HNS', 'ADMIN', 'MAINTENANCE'],
-    required: true
-  },
-  year: { type: String, required: true }, // I, II, III, IV
-  section: { type: String, required: true }, // A, B, etc.
-  phoneNumber: { type: String },
-  status: { 
-    type: String, 
-    enum: ['pending', 'approved', 'rejected'], 
-    default: 'pending' 
-  },
-  approvalHodId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Which HOD should approve
-  approvalHodName: { type: String },
-  approvalHodEmail: { type: String },
-  approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Who approved it
-  rejectionReason: { type: String }, // If rejected, why?
-  approvedAt: { type: Date },
-  rejectedAt: { type: Date },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-})
-
-StaffApprovalRequestSchema.index({ email: 1 })
-StaffApprovalRequestSchema.index({ status: 1, approvalHodId: 1 })
-StaffApprovalRequestSchema.index({ department: 1, year: 1, status: 1 })
-
-// Access Policy Schema (retained for backward compatibility or future configurations)
-const AccessPolicySchema = new mongoose.Schema({
-  key: { type: String, required: true, unique: true, default: 'login_window' },
-  staffHodWindowStart: { type: Number, default: 8 * 60 + 30 },
-  staffHodWindowEnd: { type: Number, default: 17 * 60 },
-  enforceForStaffHod: { type: Boolean, default: false },
-  updatedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  updatedAt: { type: Date, default: Date.now }
-})
-
-// Service Request Schema for CampusServe (incorporates inspection, quotation, work order, invoice, payments)
+// Service Request Schema for CampusServe
 const ServiceRequestSchema = new mongoose.Schema({
   requestNumber: { type: String, required: true, unique: true },
   title: { type: String, required: true },
@@ -256,7 +53,6 @@ const ServiceRequestSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
   }],
   
-  // Inspection Module
   inspection: {
     diagnosis: { type: String },
     recommendation: { type: String },
@@ -265,7 +61,6 @@ const ServiceRequestSchema = new mongoose.Schema({
     inspectionDate: { type: Date }
   },
   
-  // Quotation Module
   quotation: {
     quotationNumber: { type: String },
     version: { type: Number, default: 1 },
@@ -286,13 +81,12 @@ const ServiceRequestSchema = new mongoose.Schema({
       quantity: { type: Number, required: true },
       unit: { type: String, required: true },
       unitPrice: { type: Number, required: true },
-      taxRate: { type: Number, default: 18 }, // percentage
-      discount: { type: Number, default: 0 }, // absolute amount
+      taxRate: { type: Number, default: 18 },
+      discount: { type: Number, default: 0 },
       lineTotal: { type: Number, required: true }
     }]
   },
   
-  // Work Order Module
   workOrder: {
     workOrderNumber: { type: String },
     technicianId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -303,7 +97,7 @@ const ServiceRequestSchema = new mongoose.Schema({
     startDate: { type: Date },
     dueDate: { type: Date },
     approvedAmount: { type: Number },
-    status: { type: String }, // e.g. ASSIGNED, ACCEPTED, DECLINED, IN_PROGRESS, PAUSED, COMPLETED
+    status: { type: String },
     declineReason: { type: String },
     updates: [{
       progressPercent: { type: Number },
@@ -336,7 +130,6 @@ const ServiceRequestSchema = new mongoose.Schema({
     }
   },
   
-  // Requester Verification
   requesterVerification: {
     result: { type: String, enum: ['RESOLVED', 'PARTIALLY_RESOLVED', 'UNRESOLVED'] },
     rating: { type: Number, min: 1, max: 5 },
@@ -345,7 +138,6 @@ const ServiceRequestSchema = new mongoose.Schema({
     verifiedAt: { type: Date }
   },
   
-  // Invoice Module
   invoice: {
     invoiceNumber: { type: String },
     version: { type: Number, default: 1 },
@@ -368,7 +160,6 @@ const ServiceRequestSchema = new mongoose.Schema({
     }]
   },
   
-  // Payments Recorded
   payments: [{
     paymentNumber: { type: String, required: true },
     amount: { type: Number, required: true },
@@ -397,61 +188,233 @@ const NotificationSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 })
 
-// WhatsApp Instance Schema - track per-staff Evolution instances
-const WhatsappInstanceSchema = new mongoose.Schema({
-  instanceName: { type: String, required: true, index: true },
-  staffId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  ownerJid: { type: String },
-  configured: { type: Boolean, default: true },
-  metadata: { type: mongoose.Schema.Types.Mixed },
+// ─── Vendor Schema ───────────────────────────────────────────────────────────
+const VendorSchema = new mongoose.Schema({
+  vendorCode: { type: String, required: true, unique: true },
+  legalName: { type: String, required: true },
+  contactPerson: { type: String, required: true },
+  email: { type: String, required: true },
+  phone: { type: String, required: true },
+  taxNumber: { type: String },
+  address: { type: String },
+  status: { type: String, enum: ['ACTIVE', 'INACTIVE', 'BLACKLISTED'], default: 'ACTIVE' },
+  rating: { type: Number, min: 0, max: 5, default: 0 },
+  totalOrders: { type: Number, default: 0 },
+  totalValue: { type: Number, default: 0 },
+  notes: { type: String },
   createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
+  createdBy: { type: String }
+})
+VendorSchema.index({ status: 1 })
+
+// ─── Purchase Order Schema ────────────────────────────────────────────────────
+const PurchaseOrderSchema = new mongoose.Schema({
+  poNumber: { type: String, required: true, unique: true },
+  requestId: { type: mongoose.Schema.Types.ObjectId, ref: 'ServiceRequest' },
+  vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', required: true },
+  vendorName: { type: String, required: true },
+  vendorEmail: { type: String },
+  version: { type: Number, default: 1 },
+  status: { 
+    type: String, 
+    enum: ['DRAFT','SUBMITTED_FOR_APPROVAL','APPROVED','SENT_TO_VENDOR','VENDOR_ACCEPTED','ACTIVE','PARTIALLY_FULFILLED','FULFILLED','CLOSED','REVISION_REQUIRED','REJECTED','VENDOR_REJECTED','CANCELLED'],
+    default: 'DRAFT'
+  },
+  billingAddress: { type: String, default: 'MSEC Campus, Chennai' },
+  deliveryAddress: { type: String, required: true },
+  deliveryLocation: { type: String },
+  items: [{
+    description: { type: String, required: true },
+    specification: { type: String },
+    brand: { type: String },
+    model: { type: String },
+    quantityOrdered: { type: Number, required: true },
+    quantityAccepted: { type: Number, default: 0 },
+    quantityRemaining: { type: Number },
+    unit: { type: String, required: true },
+    unitPrice: { type: Number, required: true },
+    taxRate: { type: Number, default: 18 },
+    discount: { type: Number, default: 0 },
+    lineTotal: { type: Number, required: true }
+  }],
+  subtotal: { type: Number, default: 0 },
+  taxTotal: { type: Number, default: 0 },
+  discountTotal: { type: Number, default: 0 },
+  deliveryCharge: { type: Number, default: 0 },
+  grandTotal: { type: Number, default: 0 },
+  expectedDeliveryDate: { type: Date },
+  paymentTerms: { type: String, default: 'Net 30' },
+  warrantyTerms: { type: String },
+  notes: { type: String },
+  createdBy: { type: String },
+  createdAt: { type: Date, default: Date.now },
+  approvedBy: { type: String },
+  approvedAt: { type: Date },
+  vendorAcceptedAt: { type: Date },
+  vendorRejectionReason: { type: String },
+  documentUrl: { type: String },
+  statusHistory: [{
+    oldStatus: { type: String },
+    newStatus: { type: String },
+    actorId: { type: String },
+    actorName: { type: String },
+    comment: { type: String },
+    createdAt: { type: Date, default: Date.now }
+  }]
+})
+PurchaseOrderSchema.index({ status: 1 })
+PurchaseOrderSchema.index({ vendorId: 1 })
+PurchaseOrderSchema.index({ requestId: 1 })
+
+// ─── Delivery Person Schema ───────────────────────────────────────────────────
+const DeliveryPersonSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  phone: { type: String, required: true },
+  idType: { type: String, enum: ['AADHAR', 'PAN', 'DRIVING_LICENSE', 'PASSPORT'], default: 'AADHAR' },
+  idNumber: { type: String, required: true },
+  vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor' },
+  status: { type: String, enum: ['ACTIVE', 'INACTIVE'], default: 'ACTIVE' },
+  createdAt: { type: Date, default: Date.now }
 })
 
-// Pre-save hooks
-LeaveRequestSchema.pre('save', function(next) {
-  this.updatedAt = new Date()
-  next()
+// ─── Vehicle Schema ───────────────────────────────────────────────────────────
+const VehicleSchema = new mongoose.Schema({
+  vehicleNumber: { type: String, required: true },
+  vehicleType: { type: String, enum: ['TRUCK', 'VAN', 'TEMPO', 'AUTO', 'CAR', 'BIKE', 'OTHER'], default: 'OTHER' },
+  vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor' },
+  status: { type: String, enum: ['ACTIVE', 'INACTIVE'], default: 'ACTIVE' },
+  createdAt: { type: Date, default: Date.now }
 })
 
-StaffApprovalRequestSchema.pre('save', function(next) {
-  this.updatedAt = new Date()
-  next()
+// ─── Delivery Schedule Schema ─────────────────────────────────────────────────
+const DeliveryScheduleSchema = new mongoose.Schema({
+  deliveryNumber: { type: String, required: true, unique: true },
+  poId: { type: mongoose.Schema.Types.ObjectId, ref: 'PurchaseOrder', required: true },
+  poNumber: { type: String },
+  vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor' },
+  vendorName: { type: String },
+  deliveryPersonId: { type: mongoose.Schema.Types.ObjectId, ref: 'DeliveryPerson' },
+  deliveryPersonName: { type: String },
+  deliveryPersonPhone: { type: String },
+  vehicleId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vehicle' },
+  vehicleNumber: { type: String },
+  scheduledDate: { type: Date, required: true },
+  slotStart: { type: String },
+  slotEnd: { type: String },
+  deliveryLocation: { type: String, required: true },
+  challanNumber: { type: String },
+  challanUrl: { type: String },
+  status: { 
+    type: String,
+    enum: ['SCHEDULED','PASS_GENERATED','AT_GATE','ENTRY_APPROVED','IN_INSPECTION','PARTIALLY_RECEIVED','FULLY_RECEIVED','EXIT_RECORDED','ENTRY_REJECTED','RESCHEDULED','CANCELLED','EXPIRED'],
+    default: 'SCHEDULED'
+  },
+  qrToken: { type: String },
+  qrTokenHash: { type: String },
+  backupCode: { type: String },
+  backupCodeHash: { type: String },
+  passValidFrom: { type: Date },
+  passValidUntil: { type: Date },
+  passUsageCount: { type: Number, default: 0 },
+  passRevoked: { type: Boolean, default: false },
+  items: [{
+    description: { type: String },
+    quantityExpected: { type: Number },
+    unit: { type: String }
+  }],
+  createdAt: { type: Date, default: Date.now },
+  statusHistory: [{
+    oldStatus: { type: String },
+    newStatus: { type: String },
+    actorId: { type: String },
+    actorName: { type: String },
+    comment: { type: String },
+    createdAt: { type: Date, default: Date.now }
+  }]
 })
+DeliveryScheduleSchema.index({ poId: 1 })
+DeliveryScheduleSchema.index({ status: 1 })
+DeliveryScheduleSchema.index({ scheduledDate: 1 })
 
-AccessPolicySchema.pre('save', function(next) {
-  this.updatedAt = new Date()
-  next()
+// ─── Gate Entry Schema ────────────────────────────────────────────────────────
+const GateEntrySchema = new mongoose.Schema({
+  deliveryScheduleId: { type: mongoose.Schema.Types.ObjectId, ref: 'DeliverySchedule', required: true },
+  poId: { type: mongoose.Schema.Types.ObjectId, ref: 'PurchaseOrder' },
+  poNumber: { type: String },
+  verificationMethod: { type: String, enum: ['QR', 'MANUAL_CODE'], required: true },
+  decision: { type: String, enum: ['APPROVED', 'REJECTED'], required: true },
+  rejectionReason: { type: String },
+  securityUserId: { type: String },
+  securityUserName: { type: String },
+  actualDeliveryPersonName: { type: String },
+  actualVehicleNumber: { type: String },
+  entryTime: { type: Date, default: Date.now },
+  exitTime: { type: Date },
+  notes: { type: String },
+  createdAt: { type: Date, default: Date.now }
 })
+GateEntrySchema.index({ deliveryScheduleId: 1 })
+GateEntrySchema.index({ entryTime: -1 })
 
-MarksheetSchema.pre('save', function(next) {
-  if (!this.marksheetId) {
-    this.marksheetId = 'MS' + Date.now() + Math.random().toString(36).substr(2, 4).toUpperCase()
-  }
-  this.updatedAt = new Date()
-  next()
+// ─── Goods Receipt Schema ─────────────────────────────────────────────────────
+const GoodsReceiptSchema = new mongoose.Schema({
+  grnNumber: { type: String, required: true, unique: true },
+  poId: { type: mongoose.Schema.Types.ObjectId, ref: 'PurchaseOrder', required: true },
+  poNumber: { type: String },
+  deliveryScheduleId: { type: mongoose.Schema.Types.ObjectId, ref: 'DeliverySchedule' },
+  grnType: { type: String, enum: ['PARTIAL', 'FINAL', 'REJECTION', 'RETURN'], required: true },
+  status: { type: String, enum: ['DRAFT', 'FINALIZED'], default: 'DRAFT' },
+  receivedBy: { type: String },
+  receivedByName: { type: String },
+  receivedAt: { type: Date, default: Date.now },
+  remarks: { type: String },
+  items: [{
+    poItemDescription: { type: String },
+    quantityOrdered: { type: Number },
+    quantityPreviouslyAccepted: { type: Number, default: 0 },
+    quantityDeliveredNow: { type: Number, default: 0 },
+    quantityAcceptedNow: { type: Number, default: 0 },
+    quantityDamaged: { type: Number, default: 0 },
+    quantityRejected: { type: Number, default: 0 },
+    quantityRemaining: { type: Number, default: 0 },
+    unit: { type: String },
+    serialNumbers: [{ type: String }],
+    batchNumber: { type: String },
+    expiryDate: { type: Date },
+    remarks: { type: String }
+  }],
+  documentUrl: { type: String },
+  createdAt: { type: Date, default: Date.now }
 })
+GoodsReceiptSchema.index({ poId: 1 })
+GoodsReceiptSchema.index({ grnType: 1 })
+GoodsReceiptSchema.index({ status: 1 })
 
-ImportSessionSchema.pre('save', function(next) {
-  if (!this.sessionId) {
-    this.sessionId = 'IMP' + Date.now() + Math.random().toString(36).substr(2, 4).toUpperCase()
-  }
-  next()
+// ─── Audit Log Schema ─────────────────────────────────────────────────────────
+const AuditLogSchema = new mongoose.Schema({
+  entityType: { type: String, required: true },
+  entityId: { type: String, required: true },
+  action: { type: String, required: true },
+  actorId: { type: String },
+  actorName: { type: String },
+  actorRole: { type: String },
+  details: { type: mongoose.Schema.Types.Mixed },
+  ipAddress: { type: String },
+  createdAt: { type: Date, default: Date.now }
 })
+AuditLogSchema.index({ entityType: 1, entityId: 1 })
+AuditLogSchema.index({ actorId: 1 })
+AuditLogSchema.index({ createdAt: -1 })
 
-WhatsappInstanceSchema.pre('save', function(next) {
-  this.updatedAt = new Date()
-  next()
-})
-
-// Export all models, checking Mongoose cache to prevent conflicts
+// Export all models
 export const User = mongoose.models.User || mongoose.model('User', UserSchema)
-export const Student = mongoose.models.Student || mongoose.model('Student', StudentSchema)
-export const Marksheet = mongoose.models.Marksheet || mongoose.model('Marksheet', MarksheetSchema)
-export const ImportSession = mongoose.models.ImportSession || mongoose.model('ImportSession', ImportSessionSchema)
-export const LeaveRequest = mongoose.models.LeaveRequest || mongoose.model('LeaveRequest', LeaveRequestSchema)
-export const StaffApprovalRequest = mongoose.models.StaffApprovalRequest || mongoose.model('StaffApprovalRequest', StaffApprovalRequestSchema)
-export const AccessPolicy = mongoose.models.AccessPolicy || mongoose.model('AccessPolicy', AccessPolicySchema)
 export const ServiceRequest = mongoose.models.ServiceRequest || mongoose.model('ServiceRequest', ServiceRequestSchema)
 export const Notification = mongoose.models.Notification || mongoose.model('Notification', NotificationSchema)
-export const WhatsappInstance = mongoose.models.WhatsappInstance || mongoose.model('WhatsappInstance', WhatsappInstanceSchema)
+export const Vendor = mongoose.models.Vendor || mongoose.model('Vendor', VendorSchema)
+export const PurchaseOrder = mongoose.models.PurchaseOrder || mongoose.model('PurchaseOrder', PurchaseOrderSchema)
+export const DeliveryPerson = mongoose.models.DeliveryPerson || mongoose.model('DeliveryPerson', DeliveryPersonSchema)
+export const Vehicle = mongoose.models.Vehicle || mongoose.model('Vehicle', VehicleSchema)
+export const DeliverySchedule = mongoose.models.DeliverySchedule || mongoose.model('DeliverySchedule', DeliveryScheduleSchema)
+export const GateEntry = mongoose.models.GateEntry || mongoose.model('GateEntry', GateEntrySchema)
+export const GoodsReceipt = mongoose.models.GoodsReceipt || mongoose.model('GoodsReceipt', GoodsReceiptSchema)
+export const AuditLog = mongoose.models.AuditLog || mongoose.model('AuditLog', AuditLogSchema)

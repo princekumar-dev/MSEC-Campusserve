@@ -15,12 +15,8 @@ import {
 } from '../utils/notificationTypes'
 import {
   NotificationItem,
-  StaffAccountRequestItem,
-  LateArrivalRequestItem,
-  LeaveRequestItem
+  StaffAccountRequestItem
 } from './NotificationItems'
-import LateArrivalCard from './LateArrivalCard'
-import LeaveCard from './LeaveCard'
 
 function getAuthUserId(auth) {
   return (
@@ -96,15 +92,6 @@ const HODRequestItem = memo(({ request, onApprove, onReject, processing }) => {
         processing={processing}
       />
     )
-  } else if (request.type === 'leave_request') {
-    return (
-      <LeaveCard
-        request={request}
-        onApprove={onApprove}
-        onReject={onReject}
-        processing={processing}
-      />
-    )
   }
   return null
 })
@@ -140,7 +127,7 @@ export default function NotificationRequests({ isOpen, onClose, setUnreadCount }
       setLoading(true)
       // If we just did an optimistic approve/reject, bypass apiClient GET cache
       // so reopening the modal doesn't show stale pending items.
-      const optimisticTs = window.__msecOptimisticNotificationsTs
+      const optimisticTs = window.__campusserveOptimisticNotificationsTs
       const force = optimisticTs && Date.now() - optimisticTs < 2500
       scheduleFetch({ force: !!force, immediate: true })
     }
@@ -155,7 +142,7 @@ export default function NotificationRequests({ isOpen, onClose, setUnreadCount }
     return () => window.removeEventListener('authStateChanged', onAuthChange)
   }, [isOpen])
 
-  // Listen for global notification/marksheet updates so modal stays fresh (skip if we just did optimistic update)
+  // Listen for global notification/request updates so modal stays fresh
   useEffect(() => {
     if (!isOpen) return
     const handler = () => {
@@ -163,29 +150,19 @@ export default function NotificationRequests({ isOpen, onClose, setUnreadCount }
       scheduleFetch({ force: true })
     }
     window.addEventListener('notificationsUpdated', handler)
-    window.addEventListener('marksheetsUpdated', handler)
+    window.addEventListener('requestsUpdated', handler)
     return () => {
       window.removeEventListener('notificationsUpdated', handler)
-      window.removeEventListener('marksheetsUpdated', handler)
+      window.removeEventListener('requestsUpdated', handler)
     }
   }, [isOpen])
 
   // Real-time push notifications - only listen when modal is open
   usePushNotifications(isOpen ? {
-    'late_arrival': () => {
-      console.log('🔔 Late arrival notification triggered refresh in NotificationRequests')
-      fetchRequests({ force: true })
-    },
-    'leave_request': () => {
-      console.log('🔔 Leave request notification triggered refresh in NotificationRequests')
-      fetchRequests({ force: true })
-    },
     'staff_approval': () => {
-      console.log('🔔 Staff approval notification triggered refresh in NotificationRequests')
       fetchRequests({ force: true })
     },
-    'marksheet_dispatch': () => {
-      console.log('🔔 Marksheet dispatch notification triggered refresh in NotificationRequests')
+    'service_request': () => {
       fetchRequests({ force: true })
     }
   } : {})
@@ -200,7 +177,7 @@ export default function NotificationRequests({ isOpen, onClose, setUnreadCount }
     if (!requestId) return
     const now = Date.now()
     lastOptimisticUpdateRef.current = now
-    try { window.__msecOptimisticNotificationsTs = now } catch (e) { }
+    try { window.__campusserveOptimisticNotificationsTs = now } catch (e) { }
     try { optimisticHiddenIdsRef.current.set(String(requestId), now) } catch (e) { }
   }
 
@@ -288,17 +265,10 @@ export default function NotificationRequests({ isOpen, onClose, setUnreadCount }
         }
 
         const staffApiUrl = `/api/staff-approval?action=pending&hodId=${hodId}`
-        const department = auth?.department || auth.user?.department
-        // Only fetch leave requests that are pending HOD approval.
-        // This reduces payload size and makes the modal/badge feel faster.
-        const leaveApiUrl = `/api/leaves?department=${department}&type=leave&status=requested`
 
         try {
           const getOpts = force ? { cache: false, dedupe: false } : {}
-          const [staffData, leaveData] = await Promise.all([
-            apiClient.get(staffApiUrl, getOpts),
-            apiClient.get(leaveApiUrl, getOpts)
-          ])
+          const staffData = await apiClient.get(staffApiUrl, getOpts)
 
           const allRequests = []
 
@@ -320,29 +290,6 @@ export default function NotificationRequests({ isOpen, onClose, setUnreadCount }
               }
             }))
             allRequests.push(...staffRequests)
-          }
-
-          if (leaveData.success && leaveData.requests) {
-            const leaveRequests = (leaveData.requests || []).map(req => ({
-                _id: req._id,
-                type: 'leave_request',
-                createdAt: req.createdAt,
-                data: {
-                  requestId: req._id,
-                  studentName: req.studentDetails?.name,
-                  regNumber: req.studentDetails?.regNumber,
-                  department: req.studentDetails?.department,
-                  year: req.studentDetails?.year,
-                  section: req.studentDetails?.section,
-                  reason: req.reason,
-                  startDate: req.startDate,
-                  endDate: req.endDate,
-                  type: req.type,
-                  attachmentData: req.attachmentData || null,
-                  status: 'pending'
-                }
-              }))
-            allRequests.push(...leaveRequests)
           }
 
           const visibleRequests = applyOptimisticVisibility(allRequests)
@@ -495,7 +442,7 @@ export default function NotificationRequests({ isOpen, onClose, setUnreadCount }
       return
     }
 
-    // For other request types (HOD: staff_account_approval, leave_request): proceed normally
+    // For staff_account_approval requests: proceed normally
     setProcessing(request._id)
 
     markOptimisticProcessed(request._id)
@@ -522,12 +469,6 @@ export default function NotificationRequests({ isOpen, onClose, setUnreadCount }
     if (request.type === 'staff_account_approval') {
       apiClient.patch('/api/staff-approval', { requestId: request.data.requestId, action: 'approve', hodId }, { timeout: 20000, retry: 1, dispatch: false }).catch(err => {
         console.error('Error approving staff account in background:', err)
-      }).finally(() => {
-        setProcessing(null)
-      })
-    } else if (request.type === 'leave_request') {
-      apiClient.patch(`/api/leaves?id=${request.data.requestId}&action=approve`, { hodId }, { timeout: 60000, retry: 1, dispatch: false }).catch(err => {
-        console.error('Error approving leave request in background:', err)
       }).finally(() => {
         setProcessing(null)
       })
@@ -575,12 +516,6 @@ export default function NotificationRequests({ isOpen, onClose, setUnreadCount }
     if (request.type === 'staff_account_approval') {
       apiClient.patch('/api/staff-approval', { requestId: request.data.requestId, action: 'reject', hodId, rejectionReason: reason }, { dispatch: false }).catch(err => {
         console.error('Error rejecting staff account in background:', err)
-      }).finally(() => {
-        setProcessing(null)
-      })
-    } else if (request.type === 'leave_request') {
-      apiClient.patch(`/api/leaves?id=${request.data.requestId}&action=reject`, { hodId, reason }, { dispatch: false }).catch(err => {
-        console.error('Error rejecting leave request in background:', err)
       }).finally(() => {
         setProcessing(null)
       })
@@ -860,25 +795,6 @@ export default function NotificationRequests({ isOpen, onClose, setUnreadCount }
                             onDismiss={dismissNotificationHandler}
                             onMarkRead={null}
                             showNewBadge={true}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {/* Late Arrival Requests Section */}
-                {requests.length > 0 && (
-                  <>
-                    <div className={staffStatus ? "mt-6 pt-4 border-t border-gray-200" : ""}>
-                      <h3 className="text-sm font-bold text-gray-700 mb-3">Late Arrivals ({requests.length})</h3>
-                      <div className="space-y-3">
-                        {requests.map((request) => (
-                          <LateArrivalCard
-                            key={request._id}
-                            request={request}
-                            onApprove={handleApprove}
-                            processing={processing}
                           />
                         ))}
                       </div>

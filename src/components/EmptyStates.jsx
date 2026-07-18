@@ -45,15 +45,14 @@ export function EmptyState({
   )
 }
 
-// Specific empty states for common scenarios
-export function NoMarksheets({ onImport }) {
+export function NoRequests({ onCreate }) {
   return (
     <EmptyState
       illustration="empty"
-      title="No Marksheets Found"
-      description="You haven't created any marksheets yet. Import marks from Excel to get started."
-      actionLabel="Import Marks"
-      onAction={onImport}
+      title="No Service Requests"
+      description="No service requests found. Create a new request to get started."
+      actionLabel="New Request"
+      onAction={onCreate}
     />
   )
 }
@@ -63,29 +62,19 @@ export function NoSearchResults({ query, onClear }) {
     <EmptyState
       illustration="search"
       title="No Results Found"
-      description={`We couldn't find any results for "${query}". Try adjusting your search terms.`}
+      description={`No results for "${query}". Try different search terms.`}
       actionLabel="Clear Search"
       onAction={onClear}
     />
   )
 }
 
-export function NoPendingRequests() {
+export function NoPendingApprovals() {
   return (
     <EmptyState
       illustration="success"
       title="All Caught Up!"
-      description="There are no pending approval requests at the moment. Great job!"
-    />
-  )
-}
-
-export function NoDispatchRequests() {
-  return (
-    <EmptyState
-      illustration="inbox"
-      title="No Dispatch Requests"
-      description="You haven't requested any marksheet dispatches yet. Verify your marksheets first."
+      description="No pending approvals at the moment."
     />
   )
 }
@@ -95,7 +84,7 @@ export function ErrorState({ message, onRetry }) {
     <EmptyState
       illustration="error"
       title="Something Went Wrong"
-      description={message || "We encountered an error loading this data. Please try again."}
+      description={message || "An error occurred. Please try again."}
       actionLabel="Retry"
       onAction={onRetry}
     />

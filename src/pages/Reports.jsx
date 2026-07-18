@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAlert } from '../components/AlertContext'
 import apiClient from '../utils/apiClient'
 import { Landmark, TrendingUp, ShieldCheck, Users } from 'lucide-react'
+import { PageHeader } from '../components/ui'
 
 function Reports() {
   const [stats, setStats] = useState({
@@ -41,7 +42,7 @@ function Reports() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-violet-500"></div>
+        <div className="premium-spinner"></div>
       </div>
     )
   }
@@ -50,16 +51,15 @@ function Reports() {
   const maxDeptCost = departmentData.length > 0 ? Math.max(...departmentData.map(d => d.cost)) : 1
 
   return (
-    <div className="space-y-8 animate-fadeIn text-left">
-      {/* Page Title */}
-      <div>
-        <h1 className="font-display font-black text-2xl tracking-tight text-slate-800">Reports & Financial Analytics</h1>
-        <p className="text-xs text-slate-500 mt-1">Institutional overview of service expenditure, operations, and technician tasks</p>
-      </div>
+    <div className="space-y-8 page-enter text-left">
+      <PageHeader
+        title="Reports & Financial Analytics"
+        subtitle="Institutional overview of service expenditure, operations, and technician tasks"
+      />
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="premium-card p-6 flex items-center justify-between">
           <div>
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Total Expenditure</span>
             <span className="text-2xl font-black text-slate-800 mt-2 block">₹{stats.totalExpenses.toFixed(2)}</span>
@@ -70,7 +70,7 @@ function Reports() {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="premium-card p-6 flex items-center justify-between">
           <div>
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Approved Budget</span>
             <span className="text-2xl font-black text-slate-800 mt-2 block">₹{stats.totalQuotations.toFixed(2)}</span>
@@ -81,7 +81,7 @@ function Reports() {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="premium-card p-6 flex items-center justify-between">
           <div>
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Request Resolution Rate</span>
             <span className="text-2xl font-black text-slate-800 mt-2 block">
@@ -99,7 +99,7 @@ function Reports() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Cost by Department */}
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+        <div className="premium-card p-6 space-y-4">
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider pb-2 border-b border-slate-100">Expenditure by Department</h3>
           
           <div className="space-y-4">
@@ -125,7 +125,7 @@ function Reports() {
         </div>
 
         {/* Requests by Category */}
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+        <div className="premium-card p-6 space-y-4">
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider pb-2 border-b border-slate-100">Request Category Distribution</h3>
           
           <div className="space-y-4">
@@ -151,7 +151,7 @@ function Reports() {
         </div>
 
         {/* Technician Performance Logs */}
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 lg:col-span-2">
+        <div className="premium-card p-6 space-y-4 lg:col-span-2">
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider pb-2 border-b border-slate-100 flex items-center space-x-2">
             <Users size={16} />
             <span>Technician Task Logs</span>

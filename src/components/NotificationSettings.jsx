@@ -72,7 +72,7 @@ function NotificationSettings() {
 
   const handleTestNotification = async () => {
     await showNotification('Test Notification', {
-      body: 'This is a test notification from MSEC Academics',
+      body: 'This is a test notification from MSEC CampusServe',
       icon: '/images/android-chrome-192x192.png',
       badge: '/images/favicon-32x32.png',
       tag: 'test-notification'

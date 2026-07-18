@@ -19,7 +19,8 @@ function getAuthHeaders() {
   return {
     'Authorization': `Bearer ${auth.token || auth.id || ''}`,
     'X-User-Id': auth.id || '',
-    'X-User-Role': auth.role || ''
+    'X-User-Role': auth.role || '',
+    'X-User-Email': auth.email || ''
   };
 }
 
@@ -27,7 +28,7 @@ async function request(method, url, opts = {}) {
   const {
     cache: useCache = true,
     ttl = method === 'GET' ? 60 * 1000 : 0, // Cache GET requests for 60s, don't cache mutations
-    // Increase default timeout to 90s to handle batch operations with many marksheets
+    // Increase default timeout to 90s to handle batch operations
     // Batch verify/dispatch operations can take 30-60s or more depending on server load
     timeout = method === 'GET' ? 60 * 1000 : 90 * 1000, // GET: 60s, POST/PATCH: 90s
     dedupe = true,
@@ -144,11 +145,11 @@ async function request(method, url, opts = {}) {
               events = Array.isArray(dispatchEvent) ? dispatchEvent : [dispatchEvent]
             } else {
               const lower = buildUrl(url).toLowerCase()
-              if (lower.includes('/api/marksheets')) events.push('marksheetsUpdated')
+              if (lower.includes('/api/requests')) events.push('requestsUpdated')
               if (lower.includes('/api/leaves')) events.push('notificationsUpdated')
               if (lower.includes('/api/staff-approval')) events.push('notificationsUpdated')
               if (lower.includes('/api/notifications')) events.push('notificationsUpdated')
-              if (lower.includes('/api/whatsapp-dispatch')) events.push('marksheetsUpdated', 'notificationsUpdated')
+              if (lower.includes('/api/quotations') || lower.includes('/api/work-orders')) events.push('requestsUpdated', 'notificationsUpdated')
             }
 
             // Dispatch unique events

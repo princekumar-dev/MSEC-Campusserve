@@ -1,26 +1,61 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAlert } from '../components/AlertContext'
 import apiClient from '../utils/apiClient'
 import { getAuthOrNull } from '../utils/auth'
-import { Search, PlusCircle, SlidersHorizontal } from 'lucide-react'
+import { formatDistanceToNow } from 'date-fns'
+import { Search, PlusCircle, ChevronRight, X, ChevronLeft, Filter, ClipboardList, ArrowRight } from 'lucide-react'
+import { PageHeader } from '../components/ui'
 
-const statuses = [
-  'ALL', 'DRAFT', 'SUBMITTED', 'ASSIGNED_TO_MANAGER', 'QUOTATION_IN_PROGRESS', 
-  'QUOTATION_SUBMITTED', 'QUOTATION_APPROVED', 'WORK_ORDER_CREATED', 
-  'TECHNICIAN_ASSIGNED', 'IN_PROGRESS', 'PAUSED', 'TECHNICIAN_COMPLETED', 
-  'SERVICE_VERIFIED', 'PAYMENT_PENDING', 'CLOSED', 'CANCELLED'
+const ALL_STATUSES = [
+  'ALL', 'DRAFT', 'SUBMITTED', 'UNDER_ADMIN_REVIEW', 'CLARIFICATION_REQUIRED',
+  'REJECTED', 'APPROVED', 'ASSIGNED_TO_MANAGER', 'UNDER_INSPECTION',
+  'QUOTATION_IN_PROGRESS', 'QUOTATION_SUBMITTED', 'QUOTATION_APPROVED',
+  'WORK_ORDER_CREATED', 'TECHNICIAN_ASSIGNED', 'IN_PROGRESS', 'PAUSED',
+  'TECHNICIAN_COMPLETED', 'SERVICE_VERIFIED', 'PAYMENT_PENDING', 'CLOSED', 'CANCELLED'
 ]
+
+const QUICK_FILTERS = [
+  { label: 'All', value: 'ALL' },
+  { label: 'Pending Review', value: 'SUBMITTED' },
+  { label: 'In Progress', value: 'IN_PROGRESS' },
+  { label: 'Quotation', value: 'QUOTATION_SUBMITTED' },
+  { label: 'Payment', value: 'PAYMENT_PENDING' },
+  { label: 'Closed', value: 'CLOSED' },
+]
+
+const ITEMS_PER_PAGE = 15
+
+function debounce(fn, ms) {
+  let timer
+  return (...args) => {
+    clearTimeout(timer)
+    timer = setTimeout(() => fn(...args), ms)
+  }
+}
 
 function Requests() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [requests, setRequests] = useState([])
+  const [statusCounts, setStatusCounts] = useState({})
+  const [searchInput, setSearchInput] = useState(searchParams.get('search') || '')
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   const [selectedStatus, setSelectedStatus] = useState(searchParams.get('status') || 'ALL')
   const [selectedPriority, setSelectedPriority] = useState('ALL')
+  const [currentPage, setCurrentPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
+  const [showFilters, setShowFilters] = useState(false)
   const { showError } = useAlert()
   const auth = getAuthOrNull()
+  const searchRef = useRef(null)
+
+  const debouncedSearch = useCallback(
+    debounce((val) => {
+      setSearchQuery(val)
+      setCurrentPage(1)
+    }, 300),
+    []
+  )
 
   useEffect(() => {
     const fetchRequests = async () => {
@@ -29,171 +64,319 @@ function Requests() {
         const queryParams = {}
         if (selectedStatus !== 'ALL') queryParams.status = selectedStatus
         if (selectedPriority !== 'ALL') queryParams.priority = selectedPriority
-
         const res = await apiClient.get('/api/requests', { params: queryParams })
         if (res.success) {
           setRequests(res.data)
+          const counts = {}
+          res.data.forEach(r => {
+            counts[r.status] = (counts[r.status] || 0) + 1
+          })
+          counts['ALL'] = res.data.length
+          setStatusCounts(counts)
         } else {
-          showError('Load Error', res.error || 'Failed to fetch request logs')
+          showError('Load Error', res.error || 'Failed to fetch requests')
         }
       } catch (err) {
-        showError('Network Error', err.message || 'Server error loading logs')
+        showError('Network Error', err.message || 'Server error')
       } finally {
         setIsLoading(false)
       }
     }
-
     fetchRequests()
   }, [selectedStatus, selectedPriority, showError])
 
-  // Client side search filter
-  const filteredRequests = requests.filter(req => {
-    const titleMatch = req.title.toLowerCase().includes(searchQuery.toLowerCase())
-    const numMatch = req.requestNumber.toLowerCase().includes(searchQuery.toLowerCase())
-    const requesterMatch = req.requesterName.toLowerCase().includes(searchQuery.toLowerCase())
-    const locationMatch = req.location.toLowerCase().includes(searchQuery.toLowerCase())
-    return titleMatch || numMatch || requesterMatch || locationMatch
-  })
+  const filteredRequests = useMemo(() => {
+    return requests.filter(req => {
+      const q = searchQuery.toLowerCase()
+      if (!q) return true
+      return (
+        req.title?.toLowerCase().includes(q) ||
+        req.requestNumber?.toLowerCase().includes(q) ||
+        req.requesterName?.toLowerCase().includes(q) ||
+        req.location?.toLowerCase().includes(q) ||
+        req.category?.toLowerCase().includes(q)
+      )
+    })
+  }, [requests, searchQuery])
+
+  const totalPages = Math.ceil(filteredRequests.length / ITEMS_PER_PAGE)
+  const paginatedRequests = filteredRequests.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  )
+
+  useEffect(() => { setCurrentPage(1) }, [searchQuery, selectedStatus, selectedPriority])
+
+  const handleStatusFilter = (status) => {
+    setSelectedStatus(status)
+    if (status === 'ALL') {
+      searchParams.delete('status')
+    } else {
+      searchParams.set('status', status)
+    }
+    setSearchParams(searchParams)
+  }
+
+  const getPriorityBorder = (priority) => {
+    switch (priority) {
+      case 'EMERGENCY': return 'border-l-rose-500'
+      case 'HIGH': return 'border-l-amber-500'
+      case 'MEDIUM': return 'border-l-blue-500'
+      default: return 'border-l-slate-300'
+    }
+  }
 
   return (
-    <div className="space-y-6 animate-fadeIn">
-      
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-        <div>
-          <h1 className="font-display font-black text-2xl tracking-tight text-slate-800">Requests Log</h1>
-          <p className="text-xs text-slate-500 mt-1">Manage and track service request workflows across the campus</p>
-        </div>
+    <div className="space-y-6 page-enter">
 
-        {auth.role === 'requester' && (
-          <Link to="/requests/new" className="bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs py-2.5 px-6 rounded-lg flex items-center justify-center space-x-2 self-start transition-all shadow-sm shadow-violet-600/10">
+      <PageHeader
+        title="Requests"
+        subtitle={`${filteredRequests.length} requests found`}
+        action={auth?.role === 'requester' ? (
+          <Link to="/requests/new" className="btn-premium">
             <PlusCircle size={15} />
             <span>Create Request</span>
           </Link>
+        ) : null}
+      />
+
+      {/* Quick Filter Chips */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+        {QUICK_FILTERS.map(f => (
+          <button
+            key={f.value}
+            onClick={() => handleStatusFilter(f.value)}
+            className={`filter-chip flex-shrink-0 ${selectedStatus === f.value ? 'active' : ''}`}
+          >
+            {f.label}
+            {statusCounts[f.value] !== undefined && (
+              <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
+                selectedStatus === f.value ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+              }`}>
+                {statusCounts[f.value]}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Search & Advanced Filters */}
+      <div className="premium-card">
+        <div className="flex items-center gap-3 p-4">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              ref={searchRef}
+              type="text"
+              placeholder="Search by number, title, location, requester..."
+              value={searchInput}
+              onChange={(e) => {
+                setSearchInput(e.target.value)
+                debouncedSearch(e.target.value)
+              }}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 pl-10 pr-9 text-slate-800 placeholder-slate-400 text-xs focus:bg-white focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all"
+            />
+            {searchInput && (
+              <button
+                onClick={() => {
+                  setSearchInput('')
+                  setSearchQuery('')
+                  searchRef.current?.focus()
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-1.5 px-3 py-2.5 rounded-lg border text-xs font-semibold transition-all ${
+              showFilters || selectedPriority !== 'ALL'
+                ? 'bg-violet-50 border-violet-200 text-violet-700'
+                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Filter size={14} />
+            <span className="hidden sm:inline">Filters</span>
+            {selectedPriority !== 'ALL' && (
+              <span className="w-1.5 h-1.5 bg-violet-500 rounded-full" />
+            )}
+          </button>
+        </div>
+
+        {showFilters && (
+          <div className="px-4 pb-4 pt-0 border-t border-slate-100">
+            <div className="flex items-center gap-3 mt-3">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Priority</span>
+              <div className="flex gap-1.5">
+                {['ALL', 'EMERGENCY', 'HIGH', 'MEDIUM', 'LOW'].map(p => (
+                  <button
+                    key={p}
+                    onClick={() => { setSelectedPriority(p); setCurrentPage(1) }}
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${
+                      selectedPriority === p
+                        ? p === 'EMERGENCY' ? 'bg-rose-500 text-white' :
+                          p === 'HIGH' ? 'bg-amber-500 text-white' :
+                          p === 'MEDIUM' ? 'bg-blue-500 text-white' :
+                          p === 'LOW' ? 'bg-slate-500 text-white' :
+                          'bg-violet-600 text-white'
+                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                    }`}
+                  >
+                    {p === 'ALL' ? 'All' : p}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Filter Toolbar */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
-        
-        {/* Search */}
-        <div className="relative lg:col-span-2">
-          <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-            <Search size={16} />
-          </span>
-          <input
-            type="text"
-            placeholder="Search by request number, title, location..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-100 border-none rounded-lg py-2 pl-9 pr-4 text-slate-800 placeholder-slate-400 text-xs focus:bg-white focus:ring-1 focus:ring-violet-500 focus:outline-none transition-all"
-          />
-        </div>
-
-        {/* Status */}
-        <div className="flex items-center space-x-2">
-          <SlidersHorizontal size={14} className="text-violet-600 hidden sm:block" />
-          <select
-            value={selectedStatus}
-            onChange={(e) => {
-              setSelectedStatus(e.target.value)
-              setSearchParams({ status: e.target.value })
-            }}
-            className="w-full bg-slate-100 border-none rounded-lg py-2 px-3 text-slate-700 text-xs focus:bg-white focus:ring-1 focus:ring-violet-500 focus:outline-none"
-          >
-            {statuses.map(st => (
-              <option key={st} value={st} className="bg-white text-slate-700">
-                {st === 'ALL' ? 'All Statuses' : st.replace(/_/g, ' ')}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Priority */}
-        <div>
-          <select
-            value={selectedPriority}
-            onChange={(e) => setSelectedPriority(e.target.value)}
-            className="w-full bg-slate-100 border-none rounded-lg py-2 px-3 text-slate-700 text-xs focus:bg-white focus:ring-1 focus:ring-violet-500 focus:outline-none"
-          >
-            <option value="ALL" className="bg-white text-slate-700">All Priorities</option>
-            <option value="LOW" className="bg-white text-slate-700">LOW</option>
-            <option value="MEDIUM" className="bg-white text-slate-700">MEDIUM</option>
-            <option value="HIGH" className="bg-white text-slate-700">HIGH</option>
-            <option value="EMERGENCY" className="bg-white text-slate-700">EMERGENCY</option>
-          </select>
-        </div>
-
-      </div>
-
-      {/* Requests Logs Table */}
-      <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
+      {/* Results Table */}
+      <div className="premium-card overflow-hidden">
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-violet-500"></div>
+          <div className="py-16">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="flex items-center gap-4 px-6 py-4 border-b border-slate-50">
+                <div className="skeleton h-4 w-20 rounded" />
+                <div className="skeleton h-4 w-40 rounded" />
+                <div className="skeleton h-4 w-24 rounded" />
+                <div className="skeleton h-4 w-20 rounded" />
+                <div className="skeleton h-5 w-16 rounded-full" />
+                <div className="skeleton h-5 w-24 rounded-full" />
+              </div>
+            ))}
           </div>
         ) : filteredRequests.length === 0 ? (
-          <div className="text-center py-16 text-slate-400 text-xs">
-            No requests matched your filter parameters.
+          <div className="text-center py-16 px-6">
+            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <ClipboardList size={28} className="text-slate-300" />
+            </div>
+            <h3 className="text-sm font-bold text-slate-600 mb-1">
+              {searchQuery ? 'No matching requests' : 'No requests yet'}
+            </h3>
+            <p className="text-xs text-slate-400 mb-6 max-w-sm mx-auto">
+              {searchQuery
+                ? `No requests match "${searchQuery}". Try adjusting your search or filters.`
+                : 'Create your first service request to get started.'
+              }
+            </p>
+            {auth?.role === 'requester' && !searchQuery && (
+              <Link to="/requests/new" className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs py-2.5 px-6 rounded-lg transition-all">
+                <PlusCircle size={14} /> Create Request
+              </Link>
+            )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                  <th className="pb-3">Req Number</th>
-                  <th className="pb-3">Subject</th>
-                  <th className="pb-3">Location</th>
-                  <th className="pb-3">Requester</th>
-                  <th className="pb-3">Priority</th>
-                  <th className="pb-3">Status</th>
-                  <th className="pb-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-                {filteredRequests.map((req) => (
-                  <tr key={req._id} className="hover:bg-slate-55/30 transition-all">
-                    <td className="py-4 font-mono text-xs text-violet-600 font-bold">{req.requestNumber}</td>
-                    <td className="py-4 font-semibold text-slate-800">
-                      <div>{req.title}</div>
-                      <span className="text-[9px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 mt-1 inline-block capitalize">{req.category}</span>
-                    </td>
-                    <td className="py-4 text-slate-500 text-xs">{req.location}</td>
-                    <td className="py-4 text-slate-500 text-xs">
-                      <div className="font-semibold text-slate-700">{req.requesterName}</div>
-                      <div className="text-[10px] text-slate-400">{req.requesterEmail}</div>
-                    </td>
-                    <td className="py-4">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold ${
-                        req.priority === 'EMERGENCY' ? 'bg-rose-100 text-rose-700 border border-rose-200' :
-                        req.priority === 'HIGH' ? 'bg-amber-100 text-amber-700 border border-amber-200' :
-                        req.priority === 'MEDIUM' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
-                        'bg-slate-100 text-slate-600'
-                      }`}>
-                        {req.priority}
-                      </span>
-                    </td>
-                    <td className="py-4">
-                      <span className="text-[10px] font-bold text-violet-750 bg-violet-50 border border-violet-100 px-2.5 py-1 rounded-md uppercase tracking-wider">
-                        {req.status.replace(/_/g, ' ')}
-                      </span>
-                    </td>
-                    <td className="py-4 text-right">
-                      <Link 
-                        to={`/requests/${req._id}`} 
-                        className="bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs py-1.5 px-4 rounded-lg shadow-sm transition-all"
-                      >
-                        View
-                      </Link>
-                    </td>
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50">
+                    <th className="py-3 px-6">Number</th>
+                    <th className="py-3 px-2">Subject</th>
+                    <th className="py-3 px-2 hidden lg:table-cell">Location</th>
+                    <th className="py-3 px-2 hidden sm:table-cell">Requester</th>
+                    <th className="py-3 px-2">Priority</th>
+                    <th className="py-3 px-2">Status</th>
+                    <th className="py-3 px-2 hidden md:table-cell">Updated</th>
+                    <th className="py-3 px-6 text-right">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {paginatedRequests.map((req) => (
+                    <tr key={req._id} className={`table-row-hover border-l-3 ${getPriorityBorder(req.priority)}`}>
+                      <td className="py-4 px-6">
+                        <span className="font-mono text-[11px] text-violet-600 font-bold">{req.requestNumber}</span>
+                      </td>
+                      <td className="py-4 px-2">
+                        <div className="font-semibold text-slate-800 text-xs">{req.title}</div>
+                        <span className="text-[9px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded mt-1 inline-block capitalize border border-slate-100">{req.category}</span>
+                      </td>
+                      <td className="py-4 px-2 hidden lg:table-cell text-slate-500 text-xs">{req.location}</td>
+                      <td className="py-4 px-2 hidden sm:table-cell">
+                        <div className="text-xs font-semibold text-slate-700">{req.requesterName}</div>
+                      </td>
+                      <td className="py-4 px-2">
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                          req.priority === 'EMERGENCY' ? 'bg-rose-100 text-rose-700' :
+                          req.priority === 'HIGH' ? 'bg-amber-100 text-amber-700' :
+                          req.priority === 'MEDIUM' ? 'bg-blue-100 text-blue-700' :
+                          'bg-slate-100 text-slate-600'
+                        }`}>
+                          {req.priority}
+                        </span>
+                      </td>
+                      <td className="py-4 px-2">
+                        <span className={`status-badge status-${req.status.toLowerCase()}`}>
+                          {req.status.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td className="py-4 px-2 hidden md:table-cell text-[10px] text-slate-400">
+                        {req.updatedAt ? formatDistanceToNow(new Date(req.updatedAt), { addSuffix: true }) : '—'}
+                      </td>
+                      <td className="py-4 px-6 text-right">
+                        <Link
+                          to={`/requests/${req._id}`}
+                          className="inline-flex items-center gap-1 bg-violet-600 hover:bg-violet-700 text-white font-bold text-[10px] py-1.5 px-3 rounded-lg shadow-sm transition-all group"
+                        >
+                          View <ArrowRight size={10} className="group-hover:translate-x-0.5 transition-transform" />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100">
+                <span className="text-[10px] text-slate-400 font-semibold">
+                  Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredRequests.length)} of {filteredRequests.length}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let page
+                    if (totalPages <= 5) page = i + 1
+                    else if (currentPage <= 3) page = i + 1
+                    else if (currentPage >= totalPages - 2) page = totalPages - 4 + i
+                    else page = currentPage - 2 + i
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-7 h-7 rounded-lg text-[11px] font-bold transition-all ${
+                          currentPage === page
+                            ? 'bg-violet-600 text-white shadow-sm'
+                            : 'text-slate-500 hover:bg-slate-50'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  })}
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
-
     </div>
   )
 }

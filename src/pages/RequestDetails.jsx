@@ -1,14 +1,135 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAlert } from '../components/AlertContext'
 import apiClient from '../utils/apiClient'
 import { getAuthOrNull } from '../utils/auth'
-import { 
-  ArrowLeft, CheckCircle2, AlertCircle, Wrench, 
-  FileCheck, IndianRupee, Plus, Trash2, Download, Clock 
+import { formatDistanceToNow } from 'date-fns'
+import {
+  ArrowLeft, CheckCircle2, AlertCircle, Wrench, Download, Clock,
+  Plus, Trash2, IndianRupee, FileCheck, ChevronRight, Loader2,
+  AlertTriangle, CheckCircle, Circle, User, Calendar, MapPin, Tag
 } from 'lucide-react'
 
-const tabs = ['Overview', 'Diagnosis', 'Quotation', 'Work Order', 'Invoice', 'Payments', 'History']
+const WORKFLOW_STEPS = [
+  { key: 'DRAFT', label: 'Draft', short: 'Draft' },
+  { key: 'SUBMITTED', label: 'Submitted', short: 'Submit' },
+  { key: 'UNDER_ADMIN_REVIEW', label: 'Review', short: 'Review' },
+  { key: 'APPROVED', label: 'Approved', short: 'Approve' },
+  { key: 'ASSIGNED_TO_MANAGER', label: 'Assigned', short: 'Assign' },
+  { key: 'UNDER_INSPECTION', label: 'Inspection', short: 'Inspect' },
+  { key: 'QUOTATION_SUBMITTED', label: 'Quotation', short: 'Quote' },
+  { key: 'QUOTATION_APPROVED', label: 'Quote Approved', short: 'Q.Approve' },
+  { key: 'WORK_ORDER_CREATED', label: 'Work Order', short: 'W.Order' },
+  { key: 'IN_PROGRESS', label: 'In Progress', short: 'Progress' },
+  { key: 'TECHNICIAN_COMPLETED', label: 'Completed', short: 'Done' },
+  { key: 'SERVICE_VERIFIED', label: 'Verified', short: 'Verify' },
+  { key: 'INVOICE_SUBMITTED', label: 'Invoice', short: 'Invoice' },
+  { key: 'PAYMENT_PENDING', label: 'Payment', short: 'Payment' },
+  { key: 'CLOSED', label: 'Closed', short: 'Closed' },
+]
+
+const STATUS_ORDER = WORKFLOW_STEPS.map(s => s.key)
+
+const TABS = ['Overview', 'Diagnosis', 'Quotation', 'Work Order', 'Invoice', 'Payments', 'History']
+
+function ConfirmModal({ open, title, message, onConfirm, onCancel, loading }) {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onCancel}>
+      <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl border border-slate-200" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="p-2 bg-amber-50 rounded-full">
+            <AlertTriangle size={18} className="text-amber-600" />
+          </div>
+          <h3 className="font-bold text-slate-800 text-sm">{title}</h3>
+        </div>
+        <p className="text-xs text-slate-500 mb-6 leading-relaxed">{message}</p>
+        <div className="flex gap-2 justify-end">
+          <button onClick={onCancel} className="px-4 py-2 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all">
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-2"
+          >
+            {loading && <Loader2 size={12} className="animate-spin" />}
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StatusTimeline({ currentStatus }) {
+  const currentIdx = STATUS_ORDER.indexOf(currentStatus)
+  const altIdx = STATUS_ORDER.indexOf('UNDER_ADMIN_REVIEW')
+  const effectiveIdx = currentIdx >= 0 ? currentIdx : (
+    currentStatus === 'SUBMITTED' ? altIdx : -1
+  )
+  const isRejected = ['REJECTED', 'CANCELLED'].includes(currentStatus)
+  const isOpen = ['CLARIFICATION_REQUIRED', 'REOPENED'].includes(currentStatus)
+
+  return (
+    <div className="premium-card p-4 overflow-x-auto scrollbar-none">
+      <div className="step-indicator min-w-max">
+        {WORKFLOW_STEPS.map((step, idx) => {
+          const isCompleted = effectiveIdx > idx && !isRejected
+          const isCurrent = step.key === currentStatus || (
+            currentStatus === 'SUBMITTED' && step.key === 'UNDER_ADMIN_REVIEW'
+          )
+          return (
+            <div key={step.key} className="flex items-center">
+              <div className={`step-dot ${isCompleted ? 'completed' : ''} ${isCurrent ? 'active' : ''}`} title={step.label}>
+                {isCompleted ? <Check size={10} /> : <span className="text-[9px]">{idx + 1}</span>}
+              </div>
+              {idx < WORKFLOW_STEPS.length - 1 && (
+                <div className={`step-line ${isCompleted ? 'completed' : ''}`} />
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <div className="flex justify-between mt-2 min-w-max px-1">
+        {WORKFLOW_STEPS.map((step, idx) => (
+          <span key={step.key} className={`text-[7px] font-bold uppercase tracking-wider w-14 text-center ${
+            idx === effectiveIdx ? 'text-violet-600' : 'text-slate-300'
+          }`}>
+            {step.short}
+          </span>
+        ))}
+      </div>
+      {(isRejected || isOpen) && (
+        <div className={`mt-3 px-3 py-2 rounded-lg text-[10px] font-bold ${
+          isRejected ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+        }`}>
+          {isRejected ? `Request ${currentStatus.toLowerCase()}` : `Status: ${currentStatus.replace(/_/g, ' ')}`}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ActionButton({ onClick, loading, variant = 'primary', disabled, children, className = '' }) {
+  const variants = {
+    primary: 'bg-violet-600 hover:bg-violet-700 text-white',
+    success: 'bg-emerald-600 hover:bg-emerald-500 text-white',
+    danger: 'bg-rose-600 hover:bg-rose-500 text-white',
+    warning: 'bg-amber-600 hover:bg-amber-500 text-white',
+    ghost: 'bg-violet-50 hover:bg-violet-100 border border-violet-150 text-violet-750',
+  }
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled || loading}
+      className={`${variants[variant]} px-4 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${className}`}
+    >
+      {loading && <Loader2 size={12} className="animate-spin" />}
+      {children}
+    </button>
+  )
+}
 
 function RequestDetails() {
   const { id } = useParams()
@@ -19,33 +140,26 @@ function RequestDetails() {
   const [request, setRequest] = useState(null)
   const [activeTab, setActiveTab] = useState('Overview')
   const [isLoading, setIsLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState(false)
 
-  // Dropdown data
   const [technicians, setTechnicians] = useState([])
   const [managers, setManagers] = useState([])
 
-  // Forms states
   const [adminComment, setAdminComment] = useState('')
   const [assignedManagerId, setAssignedManagerId] = useState('')
-  
-  // Inspection Form
+
   const [diagnosis, setDiagnosis] = useState('')
   const [recommendation, setRecommendation] = useState('')
   const [estDuration, setEstDuration] = useState('4')
   const [serviceMode, setServiceMode] = useState('INTERNAL_STAFF')
 
-  // Quotation Builder Form
   const [quoItems, setQuoItems] = useState([{ description: '', quantity: 1, unit: 'pcs', unitPrice: 0, taxRate: 18, discount: 0, itemType: 'MATERIAL' }])
   const [quoTerms, setQuoTerms] = useState('')
 
-  // Work Order Form
   const [selectedTechId, setSelectedTechId] = useState('')
   const [woVendorName, setWoVendorName] = useState('')
   const [woScope, setWoScope] = useState('')
-  const [woStartDate, setWoStartDate] = useState('')
-  const [woDueDate, setWoDueDate] = useState('')
 
-  // Tech Updates Form
   const [progressPercent, setProgressPercent] = useState(0)
   const [progressNote, setProgressNote] = useState('')
   const [materialDesc, setMaterialDesc] = useState('')
@@ -53,37 +167,32 @@ function RequestDetails() {
   const [materialUnit, setMaterialUnit] = useState('pcs')
   const [materialUnitCost, setMaterialUnitCost] = useState(0)
 
-  // Additional Budget Form
   const [costReason, setCostReason] = useState('')
   const [costSubtotal, setCostSubtotal] = useState(0)
   const [costTax, setCostTax] = useState(0)
 
-  // Completion Form
   const [completionSummary, setCompletionSummary] = useState('')
   const [completionWarranty, setCompletionWarranty] = useState('')
   const [completionRecs, setCompletionRecs] = useState('')
 
-  // Verification Form
   const [verifyResult, setVerifyResult] = useState('RESOLVED')
   const [verifyRating, setVerifyRating] = useState(5)
   const [verifyComment, setVerifyComment] = useState('')
 
-  // Invoice Form
-  const [invItems, setInvItems] = useState([])
   const [invDiscount, setInvDiscount] = useState(0)
 
-  // Payment Form
   const [payAmount, setPayAmount] = useState(0)
   const [payMethod, setPayMethod] = useState('CASH')
   const [payRef, setPayRef] = useState('')
   const [payNotes, setPayNotes] = useState('')
+
+  const [confirmModal, setConfirmModal] = useState({ open: false })
 
   const fetchRequestDetails = async () => {
     try {
       const res = await apiClient.get(`/api/requests?id=${id}`)
       if (res.success) {
         setRequest(res.data)
-        
         if (res.data.inspection) {
           setDiagnosis(res.data.inspection.diagnosis || '')
           setRecommendation(res.data.inspection.recommendation || '')
@@ -92,61 +201,76 @@ function RequestDetails() {
         }
         if (res.data.quotation) {
           setQuoTerms(res.data.quotation.terms || '')
-          if (res.data.quotation.items && res.data.quotation.items.length > 0) {
-            setQuoItems(res.data.quotation.items)
-          }
+          if (res.data.quotation.items?.length > 0) setQuoItems(res.data.quotation.items)
         }
         if (res.data.invoice) {
           setInvDiscount(res.data.invoice.discountTotal || 0)
-          if (res.data.invoice.items && res.data.invoice.items.length > 0) {
-            setInvItems(res.data.invoice.items)
-          }
         }
       }
     } catch (err) {
-      showError('Load Error', 'Failed to retrieve request detailed parameters')
+      showError('Load Error', 'Failed to load request details')
     } finally {
       setIsLoading(false)
     }
   }
 
-  useEffect(() => {
-    fetchRequestDetails()
-  }, [id])
+  useEffect(() => { fetchRequestDetails() }, [id])
 
   useEffect(() => {
-    if (auth.role === 'admin') {
+    if (auth?.role === 'admin') {
       apiClient.get('/api/users?role=manager').then(res => {
         if (res.success) setManagers(res.users)
       })
     }
-    if (auth.role === 'manager') {
+    if (auth?.role === 'manager') {
       apiClient.get('/api/users?role=technician').then(res => {
         if (res.success) setTechnicians(res.users)
       })
     }
-  }, [auth.role])
+  }, [auth?.role])
 
-  if (isLoading || !request) {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-violet-500"></div>
-      </div>
-    )
-  }
-
-  const handleWorkflowAction = async (endpoint, payload) => {
+  const handleWorkflowAction = async (endpoint, payload, confirmMessage) => {
+    if (confirmMessage) {
+      setConfirmModal({
+        open: true,
+        title: 'Confirm Action',
+        message: confirmMessage,
+        onConfirm: async () => {
+          setConfirmModal({ open: false })
+          setActionLoading(true)
+          try {
+            const res = await apiClient.post(endpoint, payload)
+            if (res.success) {
+              showSuccess('Success', 'Action completed successfully')
+              fetchRequestDetails()
+              setAdminComment('')
+            } else {
+              showError('Failed', res.error || 'Action could not be executed')
+            }
+          } catch (err) {
+            showError('Error', err.message || 'Connection error')
+          } finally {
+            setActionLoading(false)
+          }
+        },
+        onCancel: () => setConfirmModal({ open: false })
+      })
+      return
+    }
+    setActionLoading(true)
     try {
       const res = await apiClient.post(endpoint, payload)
       if (res.success) {
-        showSuccess('Success', 'Workflow state updated successfully')
+        showSuccess('Success', 'Action completed successfully')
         fetchRequestDetails()
         setAdminComment('')
       } else {
-        showError('Action Failed', res.error || 'Action could not be executed')
+        showError('Failed', res.error || 'Action could not be executed')
       }
     } catch (err) {
-      showError('System Error', err.message || 'Workflow connection error')
+      showError('Error', err.message || 'Connection error')
+    } finally {
+      setActionLoading(false)
     }
   }
 
@@ -155,518 +279,365 @@ function RequestDetails() {
     window.open(`${origin}/api/generate-pdf?type=${type}&id=${id}`, '_blank')
   }
 
-  const addQuoItem = () => {
-    setQuoItems([...quoItems, { description: '', quantity: 1, unit: 'pcs', unitPrice: 0, taxRate: 18, discount: 0, itemType: 'MATERIAL' }])
+  const addQuoItem = () => setQuoItems([...quoItems, { description: '', quantity: 1, unit: 'pcs', unitPrice: 0, taxRate: 18, discount: 0, itemType: 'MATERIAL' }])
+  const removeQuoItem = (i) => setQuoItems(quoItems.filter((_, idx) => idx !== i))
+  const handleQuoItemChange = (i, field, val) => { const n = [...quoItems]; n[i][field] = val; setQuoItems(n) }
+
+  const getTabDot = (tab) => {
+    if (!request) return false
+    if (tab === 'Overview' && ['SUBMITTED', 'APPROVED', 'REOPENED', 'CLARIFICATION_REQUIRED'].includes(request.status)) return true
+    if (tab === 'Diagnosis' && ['ASSIGNED_TO_MANAGER'].includes(request.status) && auth?.role === 'manager') return true
+    if (tab === 'Quotation' && ['QUOTATION_IN_PROGRESS', 'QUOTATION_REVISION_REQUIRED', 'QUOTATION_SUBMITTED'].includes(request.status)) return true
+    if (tab === 'Work Order' && ['QUOTATION_APPROVED', 'TECHNICIAN_ASSIGNED', 'IN_PROGRESS'].includes(request.status)) return true
+    if (tab === 'Invoice' && ['SERVICE_VERIFIED', 'INVOICE_SUBMITTED', 'INVOICE_REVISION_REQUIRED'].includes(request.status)) return true
+    if (tab === 'Payments' && ['PAYMENT_PENDING', 'PARTIALLY_PAID'].includes(request.status)) return true
+    return false
   }
-  const removeQuoItem = (index) => {
-    setQuoItems(quoItems.filter((_, i) => i !== index))
-  }
-  const handleQuoItemChange = (index, field, val) => {
-    const newItems = [...quoItems]
-    newItems[index][field] = val
-    setQuoItems(newItems)
+
+  if (isLoading || !request) {
+    return (
+      <div className="space-y-4 animate-pulse">
+        <div className="skeleton h-8 w-48 rounded" />
+        <div className="skeleton h-12 rounded-xl" />
+        <div className="skeleton h-16 rounded-xl" />
+        <div className="skeleton h-64 rounded-xl" />
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-6 animate-fadeIn">
-      
-      {/* Back button & status info */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
-        <button 
-          onClick={() => navigate('/requests')}
-          className="flex items-center space-x-2 text-sm text-slate-500 hover:text-slate-700 transition-all font-semibold self-start"
-        >
-          <ArrowLeft size={16} />
-          <span>Back to Requests Logs</span>
-        </button>
+    <div className="space-y-6">
+      <ConfirmModal {...confirmModal} loading={actionLoading} />
 
-        <div className="flex items-center space-x-2 text-xs">
-          <span className="text-slate-500 font-medium">Current Status:</span>
-          <span className="font-bold text-violet-750 bg-violet-50 border border-violet-100 px-2 py-0.5 rounded uppercase tracking-wider">
-            {request.status.replace(/_/g, ' ')}
-          </span>
+      {/* Back + Status */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <button onClick={() => navigate('/requests')} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-all font-semibold">
+          <ArrowLeft size={16} /> Back to Requests
+        </button>
+        <div className="flex items-center gap-2">
+          <span className={`status-badge status-${request.status.toLowerCase()}`}>{request.status.replace(/_/g, ' ')}</span>
         </div>
       </div>
 
-      {/* Hero Header Banner */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0 text-left">
-        <div>
-          <span className="text-xs font-mono text-violet-600 font-bold tracking-wider">{request.requestNumber}</span>
-          <h1 className="text-2xl font-black text-slate-800 mt-1">{request.title}</h1>
-          <p className="text-sm text-slate-500 mt-1">Location: {request.location} | Requester: {request.requesterName} ({request.requesterEmail})</p>
-        </div>
+      {/* Status Timeline */}
+      <StatusTimeline currentStatus={request.status} />
 
-        <div className="flex items-center space-x-3">
+      {/* Hero Header */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="flex flex-col md:flex-row justify-between items-start gap-4">
+          <div>
+            <span className="text-xs font-mono text-violet-600 font-bold tracking-wider">{request.requestNumber}</span>
+            <h1 className="text-2xl font-black text-slate-800 mt-1">{request.title}</h1>
+            <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-slate-500">
+              <span className="flex items-center gap-1"><MapPin size={12} /> {request.location}</span>
+              <span className="flex items-center gap-1"><User size={12} /> {request.requesterName}</span>
+              <span className="flex items-center gap-1"><Tag size={12} /> {request.category}</span>
+              <span className="flex items-center gap-1"><Calendar size={12} /> {new Date(request.createdAt).toLocaleDateString()}</span>
+            </div>
+          </div>
           <span className={`px-3 py-1 rounded-full text-xs font-bold ${
             request.priority === 'EMERGENCY' ? 'bg-rose-100 text-rose-700 border border-rose-200' :
             request.priority === 'HIGH' ? 'bg-amber-100 text-amber-700 border border-amber-200' :
+            request.priority === 'MEDIUM' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
             'bg-slate-100 text-slate-600'
           }`}>
-            {request.priority} Priority
+            {request.priority}
           </span>
         </div>
       </div>
 
-      {/* Tab Menu */}
+      {/* Tabs */}
       <div className="flex overflow-x-auto space-x-1 border-b border-slate-200 pb-px scrollbar-none">
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-5 py-3 text-sm font-semibold whitespace-nowrap transition-all border-b-2 -mb-px ${
-              activeTab === tab
-                ? 'border-violet-600 text-violet-600 bg-violet-50/50'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
+        {TABS.map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)}
+            className={`relative px-5 py-3 text-sm font-semibold whitespace-nowrap transition-all border-b-2 -mb-px ${
+              activeTab === tab ? 'border-violet-600 text-violet-600 bg-violet-50/50' : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}>
             {tab}
+            {getTabDot(tab) && <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-violet-500 rounded-full" />}
           </button>
         ))}
       </div>
 
-      {/* Tab Contents */}
+      {/* Tab Content */}
       <div className="space-y-6">
-        
-        {/* OVERVIEW TAB */}
+
+        {/* OVERVIEW */}
         {activeTab === 'Overview' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
             <div className="lg:col-span-2 space-y-6">
-              {/* Description */}
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-3 text-left">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Description of Problem</h3>
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Description</h3>
                 <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{request.description}</p>
                 {request.emergencyReason && (
                   <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs mt-4">
-                    <strong>Emergency Escalation Reason:</strong> {request.emergencyReason}
+                    <strong>Emergency Reason:</strong> {request.emergencyReason}
                   </div>
                 )}
               </div>
 
-              {/* Verification & Action center (if Requester feedback is pending) */}
-              {auth.role === 'requester' && request.status === 'TECHNICIAN_COMPLETED' && (
+              {/* Requester Verification */}
+              {auth?.role === 'requester' && request.status === 'TECHNICIAN_COMPLETED' && (
                 <div className="bg-white p-6 rounded-xl border border-rose-200 shadow-sm space-y-4 text-left">
-                  <h3 className="text-sm font-bold text-rose-700 uppercase tracking-wider flex items-center space-x-2">
-                    <AlertCircle size={16} />
-                    <span>Completion Verification Required</span>
+                  <h3 className="text-sm font-bold text-rose-700 uppercase tracking-wider flex items-center gap-2">
+                    <AlertCircle size={16} /> Verify Completion
                   </h3>
-                  <p className="text-xs text-slate-500">The assigned technician has marked this task complete. Please verify if the issue is fully resolved.</p>
-
+                  <p className="text-xs text-slate-500">The technician has marked this complete. Please verify.</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-2">Resolution Result</label>
-                      <select 
-                        value={verifyResult} 
-                        onChange={(e) => setVerifyResult(e.target.value)}
-                        className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-slate-700 text-sm focus:outline-none"
-                      >
-                        <option value="RESOLVED">RESOLVED (Perfectly working)</option>
-                        <option value="PARTIALLY_RESOLVED">PARTIALLY RESOLVED (Usable but incomplete)</option>
-                        <option value="UNRESOLVED">UNRESOLVED (Needs further work)</option>
+                      <label className="block text-xs font-bold text-slate-600 mb-2">Result</label>
+                      <select value={verifyResult} onChange={e => setVerifyResult(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none">
+                        <option value="RESOLVED">RESOLVED</option>
+                        <option value="PARTIALLY_RESOLVED">PARTIALLY RESOLVED</option>
+                        <option value="UNRESOLVED">UNRESOLVED</option>
                       </select>
                     </div>
-
                     <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-2">Rating (1 to 5 stars)</label>
-                      <input 
-                        type="number" 
-                        min="1" 
-                        max="5"
-                        value={verifyRating} 
-                        onChange={(e) => setVerifyRating(e.target.value)}
-                        className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-slate-700 text-sm focus:outline-none"
-                      />
+                      <label className="block text-xs font-bold text-slate-600 mb-2">Rating</label>
+                      <input type="number" min="1" max="5" value={verifyRating} onChange={e => setVerifyRating(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none" />
                     </div>
                   </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-2">Feedback Notes</label>
-                    <textarea 
-                      rows={3}
-                      placeholder="Comment on the service performance..."
-                      value={verifyComment}
-                      onChange={(e) => setVerifyComment(e.target.value)}
-                      className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-slate-700 placeholder-slate-400 text-sm focus:outline-none resize-none"
-                    />
-                  </div>
-
-                  <button
-                    onClick={() => handleWorkflowAction(`/api/requests?action=verify&id=${id}`, { result: verifyResult, rating: verifyRating, comment: verifyComment })}
-                    className="bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs py-2.5 px-6 rounded-lg transition-all"
-                  >
-                    Submit Verification Report
-                  </button>
+                  <textarea rows={3} placeholder="Feedback notes..." value={verifyComment} onChange={e => setVerifyComment(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none resize-none" />
+                  <ActionButton onClick={() => handleWorkflowAction(`/api/requests?action=verify&id=${id}`, { result: verifyResult, rating: verifyRating, comment: verifyComment }, 'Submit verification report?')} loading={actionLoading}>
+                    Submit Verification
+                  </ActionButton>
                 </div>
               )}
 
-              {/* Admin Request Review Options */}
-              {auth.role === 'admin' && request.status === 'SUBMITTED' && (
+              {/* Admin Review */}
+              {auth?.role === 'admin' && request.status === 'SUBMITTED' && (
                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 text-left">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Admin Action Center</h3>
-                  <p className="text-xs text-slate-500">Review request and select approval workflow</p>
-                  
-                  <textarea
-                    rows={2}
-                    placeholder="Enter review decision notes / rejection reason / clarification details..."
-                    value={adminComment}
-                    onChange={(e) => setAdminComment(e.target.value)}
-                    className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-slate-750 placeholder-slate-400 text-sm focus:outline-none resize-none"
-                  />
-
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Admin Review</h3>
+                  <textarea rows={2} placeholder="Review notes..." value={adminComment} onChange={e => setAdminComment(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none resize-none" />
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => handleWorkflowAction(`/api/requests?action=approve&id=${id}`, { comment: adminComment })}
-                      className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all"
-                    >
-                      Approve Request
-                    </button>
-                    <button
-                      onClick={() => handleWorkflowAction(`/api/requests?action=clarify&id=${id}`, { comment: adminComment })}
-                      className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all"
-                    >
+                    <ActionButton variant="success" onClick={() => handleWorkflowAction(`/api/requests?action=approve&id=${id}`, { comment: adminComment }, 'Approve this request?')} loading={actionLoading}>
+                      Approve
+                    </ActionButton>
+                    <ActionButton variant="primary" onClick={() => handleWorkflowAction(`/api/requests?action=clarify&id=${id}`, { comment: adminComment })} loading={actionLoading}>
                       Request Clarification
-                    </button>
-                    <button
-                      onClick={() => handleWorkflowAction(`/api/requests?action=reject&id=${id}`, { comment: adminComment })}
-                      className="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all"
-                    >
-                      Reject Request
-                    </button>
+                    </ActionButton>
+                    <ActionButton variant="danger" onClick={() => handleWorkflowAction(`/api/requests?action=reject&id=${id}`, { comment: adminComment }, 'Reject this request?')} loading={actionLoading}>
+                      Reject
+                    </ActionButton>
                   </div>
                 </div>
               )}
 
               {/* Admin Manager Assignment */}
-              {auth.role === 'admin' && request.status === 'APPROVED' && (
+              {auth?.role === 'admin' && request.status === 'APPROVED' && (
                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 text-left">
-                  <h3 className="text-sm font-bold text-slate-850 uppercase tracking-wider">Assign Service Manager</h3>
-                  
-                  <div className="max-w-xs">
-                    <select
-                      value={assignedManagerId}
-                      onChange={(e) => setAssignedManagerId(e.target.value)}
-                      className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-slate-750 text-sm focus:outline-none"
-                    >
-                      <option value="">Select Manager...</option>
-                      {managers.map(m => (
-                        <option key={m._id} value={m._id} className="bg-white text-slate-700">{m.name} ({m.department})</option>
-                      ))}
-                    </select>
-                  </div>
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Assign Manager</h3>
+                  <select value={assignedManagerId} onChange={e => setAssignedManagerId(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none max-w-xs">
+                    <option value="">Select Manager...</option>
+                    {managers.map(m => <option key={m._id} value={m._id}>{m.name} ({m.department})</option>)}
+                  </select>
+                  <ActionButton onClick={() => handleWorkflowAction(`/api/requests?action=assign-manager&id=${id}`, { managerId: assignedManagerId }, 'Dispatch to this manager?')} disabled={!assignedManagerId} loading={actionLoading}>
+                    Dispatch to Manager
+                  </ActionButton>
+                </div>
+              )}
 
-                  <button
-                    disabled={!assignedManagerId}
-                    onClick={() => handleWorkflowAction(`/api/requests?action=assign-manager&id=${id}`, { managerId: assignedManagerId })}
-                    className="bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs py-2.5 px-6 rounded-lg transition-all disabled:opacity-50"
-                  >
-                    Dispatch to Selected Manager
-                  </button>
+              {/* Reopened */}
+              {auth?.role === 'admin' && request.status === 'REOPENED' && (
+                <div className="bg-white p-6 rounded-xl border border-rose-200 shadow-sm space-y-4 text-left">
+                  <h3 className="text-sm font-bold text-rose-700 uppercase tracking-wider flex items-center gap-2">
+                    <AlertCircle size={16} /> Request Reopened
+                  </h3>
+                  <textarea rows={2} placeholder="Decision notes..." value={adminComment} onChange={e => setAdminComment(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none resize-none" />
+                  <div className="flex flex-wrap gap-2">
+                    <ActionButton variant="success" onClick={() => handleWorkflowAction(`/api/requests?action=approve&id=${id}`, { comment: adminComment || 'Re-approved' }, 'Re-approve this request?')} loading={actionLoading}>
+                      Re-Approve
+                    </ActionButton>
+                    <ActionButton variant="danger" onClick={() => handleWorkflowAction(`/api/requests?action=reject&id=${id}`, { comment: adminComment || 'Closed' }, 'Close this request?')} loading={actionLoading}>
+                      Close
+                    </ActionButton>
+                  </div>
+                </div>
+              )}
+
+              {/* Clarification Required */}
+              {auth?.role === 'requester' && request.status === 'CLARIFICATION_REQUIRED' && (
+                <div className="bg-white p-6 rounded-xl border border-amber-200 shadow-sm space-y-4 text-left">
+                  <h3 className="text-sm font-bold text-amber-700 uppercase tracking-wider flex items-center gap-2">
+                    <AlertCircle size={16} /> Clarification Required
+                  </h3>
+                  <p className="text-xs text-slate-500">Admin has requested additional information.</p>
+                  <ActionButton onClick={() => handleWorkflowAction(`/api/requests?action=submit&id=${id}`, { comment: 'Resubmitted after clarification' }, 'Resubmit for review?')} loading={actionLoading}>
+                    Resubmit for Review
+                  </ActionButton>
                 </div>
               )}
             </div>
 
-            {/* Sidebar metadata */}
+            {/* Sidebar */}
             <div className="space-y-6 text-left">
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 text-sm">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider pb-2 border-b border-slate-100">Request Details</h3>
-                
-                <div className="flex justify-between">
-                  <span className="text-slate-500 font-medium">Category</span>
-                  <span className="text-slate-800 font-bold text-right">{request.category}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500 font-medium">Asset Code</span>
-                  <span className="text-slate-850 font-bold text-right font-mono text-xs">{request.assetCode || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500 font-medium">Created On</span>
-                  <span className="text-slate-805 font-bold text-right">{new Date(request.createdAt).toLocaleDateString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500 font-medium">Manager</span>
-                  <span className="text-slate-800 font-bold text-right">{request.assignedManagerName || 'Unassigned'}</span>
-                </div>
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider pb-2 border-b border-slate-100">Details</h3>
+                {[
+                  ['Category', request.category],
+                  ['Asset Code', request.assetCode || 'N/A'],
+                  ['Created', new Date(request.createdAt).toLocaleDateString()],
+                  ['Manager', request.assignedManagerName || 'Unassigned'],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex justify-between">
+                    <span className="text-slate-500 font-medium">{label}</span>
+                    <span className="text-slate-800 font-bold text-right">{value}</span>
+                  </div>
+                ))}
               </div>
             </div>
-
           </div>
         )}
 
-        {/* DIAGNOSIS TAB */}
+        {/* DIAGNOSIS */}
         {activeTab === 'Diagnosis' && (
           <div className="max-w-xl mx-auto bg-white p-8 rounded-xl border border-slate-200 shadow-sm space-y-6 text-left">
-            <div className="flex items-center space-x-3 pb-3 border-b border-slate-100">
-              <div className="p-2 bg-violet-50 rounded-lg text-violet-600">
-                <Wrench size={18} />
-              </div>
-              <h3 className="text-base font-bold text-slate-800">Manager Diagnostic Assessment</h3>
+            <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+              <div className="p-2 bg-violet-50 rounded-lg text-violet-600"><Wrench size={18} /></div>
+              <h3 className="text-base font-bold text-slate-800">Diagnostic Assessment</h3>
             </div>
-
             {request.inspection ? (
               <div className="space-y-4 text-sm text-slate-700">
                 <div>
-                  <strong className="text-slate-400 font-bold block mb-1">Diagnosis Analysis:</strong>
-                  <p className="bg-slate-50 p-3 rounded border border-slate-150 leading-relaxed text-xs">{request.inspection.diagnosis}</p>
+                  <strong className="text-slate-400 font-bold block mb-1">Diagnosis:</strong>
+                  <p className="bg-slate-50 p-3 rounded border border-slate-100 leading-relaxed text-xs">{request.inspection.diagnosis}</p>
                 </div>
                 <div>
-                  <strong className="text-slate-400 font-bold block mb-1">Repair Recommendation:</strong>
-                  <p className="bg-slate-50 p-3 rounded border border-slate-150 leading-relaxed text-xs">{request.inspection.recommendation}</p>
+                  <strong className="text-slate-400 font-bold block mb-1">Recommendation:</strong>
+                  <p className="bg-slate-50 p-3 rounded border border-slate-100 leading-relaxed text-xs">{request.inspection.recommendation}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <strong className="text-slate-400 font-bold block mb-0.5">Est. Duration:</strong>
-                    <span className="text-slate-800 font-semibold">{request.inspection.estimatedDurationHours} hours</span>
-                  </div>
-                  <div>
-                    <strong className="text-slate-400 font-bold block mb-0.5">Service Mode:</strong>
-                    <span className="text-slate-800 font-semibold capitalize">{request.inspection.serviceMode.replace(/_/g, ' ')}</span>
-                  </div>
+                  <div><strong className="text-slate-400 font-bold block mb-0.5">Duration:</strong><span className="text-slate-800 font-semibold">{request.inspection.estimatedDurationHours}h</span></div>
+                  <div><strong className="text-slate-400 font-bold block mb-0.5">Mode:</strong><span className="text-slate-800 font-semibold capitalize">{request.inspection.serviceMode.replace(/_/g, ' ')}</span></div>
                 </div>
               </div>
-            ) : auth.role === 'manager' && request.status === 'ASSIGNED_TO_MANAGER' ? (
+            ) : auth?.role === 'manager' && request.status === 'ASSIGNED_TO_MANAGER' ? (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-2">Diagnosis Details *</label>
-                  <textarea
-                    rows={3}
-                    placeholder="Enter diagnostic analysis..."
-                    value={diagnosis}
-                    onChange={(e) => setDiagnosis(e.target.value)}
-                    className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-slate-800 placeholder-slate-400 text-sm focus:outline-none resize-none"
-                  />
+                  <label className="block text-xs font-bold text-slate-600 mb-2">Diagnosis *</label>
+                  <textarea rows={3} placeholder="Diagnostic analysis..." value={diagnosis} onChange={e => setDiagnosis(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none resize-none" />
                 </div>
-
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-2">Repair Recommendation *</label>
-                  <textarea
-                    rows={3}
-                    placeholder="Enter recommendation..."
-                    value={recommendation}
-                    onChange={(e) => setRecommendation(e.target.value)}
-                    className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-slate-800 placeholder-slate-400 text-sm focus:outline-none resize-none"
-                  />
+                  <label className="block text-xs font-bold text-slate-600 mb-2">Recommendation *</label>
+                  <textarea rows={3} placeholder="Recommendation..." value={recommendation} onChange={e => setRecommendation(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none resize-none" />
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-2">Est. Hours</label>
-                    <input 
-                      type="number" 
-                      value={estDuration} 
-                      onChange={(e) => setEstDuration(e.target.value)}
-                      className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-slate-800 text-sm focus:outline-none"
-                    />
+                    <input type="number" value={estDuration} onChange={e => setEstDuration(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none" />
                   </div>
-
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-2">Service Execution Mode</label>
-                    <select
-                      value={serviceMode}
-                      onChange={(e) => setServiceMode(e.target.value)}
-                      className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-slate-700 text-sm focus:outline-none"
-                    >
-                      <option value="INTERNAL_STAFF">Internal Technician</option>
+                    <label className="block text-xs font-bold text-slate-600 mb-2">Service Mode</label>
+                    <select value={serviceMode} onChange={e => setServiceMode(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none">
+                      <option value="INTERNAL_STAFF">Internal</option>
                       <option value="EXTERNAL_VENDOR">External Vendor</option>
                     </select>
                   </div>
                 </div>
-
-                <button
-                  onClick={() => handleWorkflowAction(`/api/requests?action=inspect&id=${id}`, { diagnosis, recommendation, estimatedDurationHours: estDuration, serviceMode })}
-                  className="bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs py-3 rounded-lg transition-all w-full"
-                >
-                  Complete Diagnosis Report
-                </button>
+                <ActionButton onClick={() => handleWorkflowAction(`/api/requests?action=inspect&id=${id}`, { diagnosis, recommendation, estimatedDurationHours: estDuration, serviceMode }, 'Submit diagnosis report?')} loading={actionLoading} className="w-full">
+                  Submit Diagnosis
+                </ActionButton>
               </div>
             ) : (
-              <div className="text-center py-6 text-slate-400 text-xs">
-                Diagnostic reports are not available or pending manager inspection.
-              </div>
+              <div className="text-center py-6 text-slate-400 text-xs">No inspection data available.</div>
             )}
           </div>
         )}
 
-        {/* QUOTATION TAB */}
+        {/* QUOTATION */}
         {activeTab === 'Quotation' && (
           <div className="space-y-6">
-            
-            {/* Admin Quotation approval options */}
-            {auth.role === 'admin' && request.status === 'QUOTATION_SUBMITTED' && (
+            {auth?.role === 'admin' && request.status === 'QUOTATION_SUBMITTED' && (
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 text-left">
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Admin Budget Approval Center</h3>
-                
-                <textarea
-                  rows={2}
-                  placeholder="Enter approval or revision instructions comment..."
-                  value={adminComment}
-                  onChange={(e) => setAdminComment(e.target.value)}
-                  className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-slate-800 placeholder-slate-400 text-sm focus:outline-none resize-none"
-                />
-
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Budget Approval</h3>
+                <textarea rows={2} placeholder="Approval notes..." value={adminComment} onChange={e => setAdminComment(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none resize-none" />
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => handleWorkflowAction(`/api/quotations?action=approve&id=${id}`, { comment: adminComment })}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all"
-                  >
-                    Approve Quotation
-                  </button>
-                  <button
-                    onClick={() => handleWorkflowAction(`/api/quotations?action=revise&id=${id}`, { comment: adminComment })}
-                    className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all"
-                  >
-                    Request Revision
-                  </button>
-                  <button
-                    onClick={() => handleWorkflowAction(`/api/quotations?action=reject&id=${id}`, { comment: adminComment })}
-                    className="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all"
-                  >
-                    Reject Quotation
-                  </button>
+                  <ActionButton variant="success" onClick={() => handleWorkflowAction(`/api/quotations?action=approve&id=${id}`, { comment: adminComment }, 'Approve quotation?')} loading={actionLoading}>Approve</ActionButton>
+                  <ActionButton variant="primary" onClick={() => handleWorkflowAction(`/api/quotations?action=revise&id=${id}`, { comment: adminComment })} loading={actionLoading}>Request Revision</ActionButton>
+                  <ActionButton variant="danger" onClick={() => handleWorkflowAction(`/api/quotations?action=reject&id=${id}`, { comment: adminComment }, 'Reject quotation?')} loading={actionLoading}>Reject</ActionButton>
                 </div>
               </div>
             )}
 
-            {/* Display Quotation */}
             {request.quotation ? (
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5 text-left">
                 <div className="flex justify-between items-center pb-3 border-b border-slate-100">
                   <div>
-                    <span className="text-xs text-slate-400 font-mono">Quotation Estimate</span>
-                    <h3 className="text-base font-bold text-slate-800">{request.quotation.quotationNumber} (v{request.quotation.version})</h3>
+                    <span className="text-xs text-slate-400 font-mono">{request.quotation.quotationNumber}</span>
+                    <h3 className="text-base font-bold text-slate-800">v{request.quotation.version}</h3>
                   </div>
-
-                  <button
-                    onClick={() => openPdf('quotation')}
-                    className="flex items-center space-x-1.5 bg-violet-50 hover:bg-violet-100 border border-violet-150 text-violet-750 px-4 py-2 rounded-lg text-xs font-bold transition-all animate-fadeIn"
-                  >
-                    <Download size={14} />
-                    <span>Download PDF</span>
-                  </button>
+                  <ActionButton variant="ghost" onClick={() => openPdf('quotation')}><Download size={14} /> PDF</ActionButton>
                 </div>
-
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm text-slate-700">
+                  <table className="w-full text-left text-sm">
                     <thead>
-                      <tr className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
-                        <th className="pb-2">Type</th>
-                        <th className="pb-2">Description</th>
-                        <th className="pb-2 text-right">Qty</th>
-                        <th className="pb-2 text-right">Unit Price</th>
-                        <th className="pb-2 text-right">Tax (GST)</th>
-                        <th className="pb-2 text-right">Total</th>
+                      <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                        <th className="pb-2">Type</th><th className="pb-2">Description</th><th className="pb-2 text-right">Qty</th><th className="pb-2 text-right">Price</th><th className="pb-2 text-right">Tax</th><th className="pb-2 text-right">Total</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {request.quotation.items.map((item, idx) => (
                         <tr key={idx} className="hover:bg-slate-50/50">
-                          <td className="py-2.5 capitalize">{item.itemType.toLowerCase()}</td>
+                          <td className="py-2.5 capitalize text-xs">{item.itemType.toLowerCase()}</td>
                           <td className="py-2.5 font-semibold text-slate-800">{item.description}</td>
-                          <td className="py-2.5 text-right">{item.quantity} {item.unit}</td>
-                          <td className="py-2.5 text-right">₹{item.unitPrice.toFixed(2)}</td>
-                          <td className="py-2.5 text-right">{item.taxRate}%</td>
-                          <td className="py-2.5 text-right font-bold text-slate-800">₹{item.lineTotal.toFixed(2)}</td>
+                          <td className="py-2.5 text-right text-xs">{item.quantity} {item.unit}</td>
+                          <td className="py-2.5 text-right text-xs">₹{item.unitPrice.toFixed(2)}</td>
+                          <td className="py-2.5 text-right text-xs">{item.taxRate}%</td>
+                          <td className="py-2.5 text-right font-bold text-slate-800 text-xs">₹{item.lineTotal.toFixed(2)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-
-                <div className="flex justify-end pt-4 border-t border-slate-100 text-sm font-semibold text-slate-700">
-                  <div className="space-y-1.5 text-right">
-                    <div>Subtotal: ₹{request.quotation.subtotal.toFixed(2)}</div>
-                    <div>Tax Total: ₹{request.quotation.taxTotal.toFixed(2)}</div>
-                    <div className="text-violet-700 text-base font-bold">Grand Total: ₹{request.quotation.grandTotal.toFixed(2)}</div>
+                <div className="flex justify-end pt-4 border-t border-slate-100 text-sm">
+                  <div className="space-y-1 text-right">
+                    <div className="text-xs text-slate-500">Subtotal: ₹{request.quotation.subtotal.toFixed(2)}</div>
+                    <div className="text-xs text-slate-500">Tax: ₹{request.quotation.taxTotal.toFixed(2)}</div>
+                    <div className="text-violet-700 font-bold">Total: ₹{request.quotation.grandTotal.toFixed(2)}</div>
                   </div>
                 </div>
-
-                {auth.role === 'manager' && request.status === 'QUOTATION_IN_PROGRESS' && (
-                  <button
-                    onClick={() => handleWorkflowAction(`/api/quotations?action=submit&id=${id}`)}
-                    className="bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs py-2.5 px-6 rounded-lg transition-all"
-                  >
-                    Submit Quotation for Approval
-                  </button>
+                {auth?.role === 'manager' && request.status === 'QUOTATION_IN_PROGRESS' && (
+                  <ActionButton onClick={() => handleWorkflowAction(`/api/quotations?action=submit&id=${id}`, {}, 'Submit quotation for approval?')} loading={actionLoading}>
+                    Submit Quotation
+                  </ActionButton>
                 )}
               </div>
             ) : null}
 
-            {/* Quotation Builder (visible to managers) */}
-            {auth.role === 'manager' && 
-             (['QUOTATION_IN_PROGRESS', 'QUOTATION_REVISION_REQUIRED'].includes(request.status) || !request.quotation) && (
+            {auth?.role === 'manager' && (['QUOTATION_IN_PROGRESS', 'QUOTATION_REVISION_REQUIRED'].includes(request.status) || !request.quotation) && (
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6 text-left">
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Quotation Line-Item Estimate Builder</h3>
-
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Build Estimate</h3>
                 <div className="space-y-4">
                   {quoItems.map((item, idx) => (
-                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-6 gap-3 items-end p-4 bg-slate-50 rounded-lg border border-slate-150">
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-6 gap-3 items-end p-4 bg-slate-50 rounded-lg border border-slate-100">
                       <div className="sm:col-span-1">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Type</label>
-                        <select
-                          value={item.itemType}
-                          onChange={(e) => handleQuoItemChange(idx, 'itemType', e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs text-slate-700 focus:outline-none"
-                        >
-                          <option value="MATERIAL">Material</option>
-                          <option value="LABOUR">Labour</option>
-                          <option value="SERVICE">Service</option>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Type</label>
+                        <select value={item.itemType} onChange={e => handleQuoItemChange(idx, 'itemType', e.target.value)} className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none">
+                          <option value="MATERIAL">Material</option><option value="LABOUR">Labour</option><option value="SERVICE">Service</option>
                         </select>
                       </div>
                       <div className="sm:col-span-2">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Description *</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. HDMI Board Replacement"
-                          value={item.description}
-                          onChange={(e) => handleQuoItemChange(idx, 'description', e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs text-slate-700 focus:outline-none"
-                        />
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Description</label>
+                        <input type="text" placeholder="Description..." value={item.description} onChange={e => handleQuoItemChange(idx, 'description', e.target.value)} className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none" />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Qty</label>
-                        <input
-                          type="number"
-                          value={item.quantity}
-                          onChange={(e) => handleQuoItemChange(idx, 'quantity', e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs text-slate-700 focus:outline-none"
-                        />
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Qty</label>
+                        <input type="number" value={item.quantity} onChange={e => handleQuoItemChange(idx, 'quantity', e.target.value)} className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none" />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Price (₹) *</label>
-                        <input
-                          type="number"
-                          value={item.unitPrice}
-                          onChange={(e) => handleQuoItemChange(idx, 'unitPrice', e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs text-slate-700 focus:outline-none"
-                        />
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Price (₹)</label>
+                        <input type="number" value={item.unitPrice} onChange={e => handleQuoItemChange(idx, 'unitPrice', e.target.value)} className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none" />
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <button
-                          type="button"
-                          onClick={() => removeQuoItem(idx)}
-                          className="p-2 text-rose-600 hover:bg-rose-50 rounded border border-rose-100 mt-6 bg-rose-50"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                      <button type="button" onClick={() => removeQuoItem(idx)} className="p-2 text-rose-600 hover:bg-rose-50 rounded border border-rose-100 mt-5 bg-rose-50"><Trash2 size={14} /></button>
                     </div>
                   ))}
-
-                  <button
-                    type="button"
-                    onClick={addQuoItem}
-                    className="flex items-center space-x-1 text-xs text-violet-600 hover:text-violet-700 font-bold"
-                  >
-                    <Plus size={14} />
-                    <span>Add Line Item</span>
+                  <button type="button" onClick={addQuoItem} className="flex items-center gap-1 text-xs text-violet-600 hover:text-violet-700 font-bold">
+                    <Plus size={14} /> Add Line Item
                   </button>
-
                   <div className="pt-4 border-t border-slate-200">
-                    <button
-                      onClick={() => handleWorkflowAction(`/api/quotations?requestId=${id}`, { items: quoItems, terms: quoTerms })}
-                      className="bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs py-2.5 px-6 rounded-lg transition-all"
-                    >
-                      Save Estimate Draft
-                    </button>
+                    <ActionButton onClick={() => handleWorkflowAction(`/api/quotations?requestId=${id}`, { items: quoItems, terms: quoTerms })} loading={actionLoading}>
+                      Save Draft
+                    </ActionButton>
                   </div>
                 </div>
               </div>
@@ -674,128 +645,77 @@ function RequestDetails() {
           </div>
         )}
 
-        {/* WORK ORDER TAB */}
+        {/* WORK ORDER */}
         {activeTab === 'Work Order' && (
           <div className="space-y-6">
-            
-            {/* Work Order Builder */}
-            {auth.role === 'manager' && request.status === 'QUOTATION_APPROVED' && !request.workOrder?.workOrderNumber && (
+            {auth?.role === 'manager' && request.status === 'QUOTATION_APPROVED' && !request.workOrder?.workOrderNumber && (
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5 text-left">
-                <h3 className="text-sm font-bold text-slate-850 uppercase tracking-wider">Generate & Dispatch Work Order</h3>
-
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Create Work Order</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-2">Assign Technician</label>
-                    <select
-                      value={selectedTechId}
-                      onChange={(e) => setSelectedTechId(e.target.value)}
-                      className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-slate-700 text-sm focus:outline-none"
-                    >
-                      <option value="">Select Technician...</option>
-                      {technicians.map(t => (
-                        <option key={t._id} value={t._id} className="bg-white text-slate-700">{t.name} ({t.department})</option>
-                      ))}
+                    <label className="block text-xs font-bold text-slate-600 mb-2">Technician</label>
+                    <select value={selectedTechId} onChange={e => setSelectedTechId(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none">
+                      <option value="">Select...</option>
+                      {technicians.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
                     </select>
                   </div>
-
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-2">External Vendor (If external)</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. ABC Projector Services"
-                      value={woVendorName}
-                      onChange={(e) => setWoVendorName(e.target.value)}
-                      className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-slate-750 text-sm focus:outline-none"
-                    />
+                    <label className="block text-xs font-bold text-slate-600 mb-2">Vendor (if external)</label>
+                    <input type="text" placeholder="Vendor name..." value={woVendorName} onChange={e => setWoVendorName(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none" />
                   </div>
                 </div>
-
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-2">Scope of Work</label>
-                  <textarea 
-                    rows={3}
-                    placeholder="Provide details..."
-                    value={woScope}
-                    onChange={(e) => setWoScope(e.target.value)}
-                    className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-slate-750 placeholder-slate-400 text-sm focus:outline-none resize-none"
-                  />
+                  <textarea rows={3} placeholder="Details..." value={woScope} onChange={e => setWoScope(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none resize-none" />
                 </div>
-
-                <button
-                  onClick={() => handleWorkflowAction(`/api/work-orders?requestId=${id}`, { technicianId: selectedTechId, vendorName: woVendorName, scope: woScope })}
-                  className="bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs py-2.5 px-6 rounded-lg transition-all"
-                >
+                <ActionButton onClick={() => handleWorkflowAction(`/api/work-orders?requestId=${id}`, { technicianId: selectedTechId, vendorName: woVendorName, scope: woScope }, 'Issue work order?')} loading={actionLoading}>
                   Issue Work Order
-                </button>
+                </ActionButton>
               </div>
             )}
 
-            {/* Display Work Order */}
-            {request.workOrder && request.workOrder.workOrderNumber ? (
+            {request.workOrder?.workOrderNumber ? (
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6 text-left">
                 <div className="flex justify-between items-center pb-3 border-b border-slate-100">
                   <div>
-                    <span className="text-xs text-slate-400 font-mono">Work Order Details</span>
-                    <h3 className="text-base font-bold text-slate-800">{request.workOrder.workOrderNumber}</h3>
+                    <span className="text-xs text-slate-400 font-mono">{request.workOrder.workOrderNumber}</span>
+                    <h3 className="text-base font-bold text-slate-800">Work Order</h3>
                   </div>
-
-                  <button
-                    onClick={() => openPdf('workorder')}
-                    className="flex items-center space-x-1.5 bg-violet-50 hover:bg-violet-100 border border-violet-150 text-violet-750 px-4 py-2 rounded-lg text-xs font-bold transition-all"
-                  >
-                    <Download size={14} />
-                    <span>Download PDF</span>
-                  </button>
+                  <ActionButton variant="ghost" onClick={() => openPdf('workorder')}><Download size={14} /> PDF</ActionButton>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm text-slate-700">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
                   <div className="space-y-2">
-                    <div><strong>Technician:</strong> {request.workOrder.technicianName || 'External Vendor'}</div>
+                    <div><strong>Technician:</strong> {request.workOrder.technicianName || 'External'}</div>
                     {request.workOrder.vendorName && <div><strong>Vendor:</strong> {request.workOrder.vendorName}</div>}
-                    <div><strong>Approved Budget:</strong> ₹{request.workOrder.approvedAmount.toFixed(2)}</div>
+                    <div><strong>Budget:</strong> ₹{request.workOrder.approvedAmount?.toFixed(2)}</div>
                   </div>
-                  <div className="space-y-2">
-                    <div><strong>Scope of Work:</strong></div>
-                    <p className="bg-slate-55/40 p-3 rounded border border-slate-150 leading-relaxed text-xs">{request.workOrder.scope}</p>
+                  <div>
+                    <strong>Scope:</strong>
+                    <p className="bg-slate-50 p-3 rounded border border-slate-100 text-xs mt-1">{request.workOrder.scope}</p>
                   </div>
                 </div>
 
-                {/* Additional Cost Requests */}
-                {request.workOrder.additionalCosts && request.workOrder.additionalCosts.length > 0 && (
+                {/* Additional Costs */}
+                {request.workOrder.additionalCosts?.length > 0 && (
                   <div className="pt-4 border-t border-slate-100">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Additional Cost Approvals</h4>
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Additional Costs</h4>
                     <div className="space-y-3">
-                      {request.workOrder.additionalCosts.map((c) => (
-                        <div key={c._id} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-150 rounded">
+                      {request.workOrder.additionalCosts.map(c => (
+                        <div key={c._id} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-100 rounded">
                           <div>
-                            <div className="text-xs font-bold text-slate-750">{c.reason}</div>
-                            <div className="text-[10px] text-slate-400">Requested by: {c.requestedBy}</div>
+                            <div className="text-xs font-bold text-slate-700">{c.reason}</div>
+                            <div className="text-[10px] text-slate-400">{c.requestedBy}</div>
                           </div>
-
-                          <div className="flex items-center space-x-3">
-                            <span className="text-xs font-bold text-slate-750">₹{c.grandTotal.toFixed(2)}</span>
-                            {c.status === 'PENDING' && auth.role === 'admin' ? (
-                              <div className="flex space-x-1.5">
-                                <button
-                                  onClick={() => handleWorkflowAction(`/api/work-orders?action=approve-cost&id=${id}&costId=${c._id}`)}
-                                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded text-[10px] font-bold"
-                                >
-                                  Approve
-                                </button>
-                                <button
-                                  onClick={() => handleWorkflowAction(`/api/work-orders?action=reject-cost&id=${id}&costId=${c._id}`)}
-                                  className="bg-rose-600 hover:bg-rose-500 text-white px-2.5 py-1 rounded text-[10px] font-bold"
-                                >
-                                  Reject
-                                </button>
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs font-bold">₹{c.grandTotal.toFixed(2)}</span>
+                            {c.status === 'PENDING' && auth?.role === 'admin' ? (
+                              <div className="flex gap-1.5">
+                                <ActionButton variant="success" onClick={() => handleWorkflowAction(`/api/work-orders?action=approve-cost&id=${id}&costId=${c._id}`, {}, 'Approve cost?')} loading={actionLoading} className="text-[10px] py-1 px-2">Approve</ActionButton>
+                                <ActionButton variant="danger" onClick={() => handleWorkflowAction(`/api/work-orders?action=reject-cost&id=${id}&costId=${c._id}`, {}, 'Reject cost?')} loading={actionLoading} className="text-[10px] py-1 px-2">Reject</ActionButton>
                               </div>
                             ) : (
-                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
-                                c.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-850' : 
-                                c.status === 'REJECTED' ? 'bg-rose-100 text-rose-850' : 'bg-slate-100 text-slate-600'
-                              }`}>
-                                {c.status}
-                              </span>
+                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${c.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : c.status === 'REJECTED' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{c.status}</span>
                             )}
                           </div>
                         </div>
@@ -804,418 +724,237 @@ function RequestDetails() {
                   </div>
                 )}
 
-                {/* Material usage list */}
-                {request.workOrder.materials && request.workOrder.materials.length > 0 && (
+                {/* Materials */}
+                {request.workOrder.materials?.length > 0 && (
                   <div className="pt-4 border-t border-slate-100">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Recorded Material Usage</h4>
-                    <ul className="text-xs text-slate-650 space-y-1">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Materials</h4>
+                    <ul className="text-xs divide-y divide-slate-50">
                       {request.workOrder.materials.map((m, idx) => (
-                        <li key={idx} className="flex justify-between py-1 border-b border-slate-50">
-                          <span>{m.description} (Qty: {m.quantity})</span>
-                          <span className="font-bold text-slate-800">₹{m.totalCost.toFixed(2)}</span>
+                        <li key={idx} className="flex justify-between py-2">
+                          <span>{m.description} (×{m.quantity})</span>
+                          <span className="font-bold">₹{m.totalCost.toFixed(2)}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
                 )}
 
-                {/* Technician Action Center */}
-                {auth.role === 'technician' && request.workOrder.technicianId === auth.id && (
-                  <div className="pt-4 border-t border-slate-100 space-y-6">
-                    <h4 className="text-xs font-bold text-violet-600 uppercase tracking-wider">Technician Work Center</h4>
-                    
+                {/* Technician Actions */}
+                {auth?.role === 'technician' && String(request.workOrder.technicianId) === String(auth?.id) && (
+                  <div className="pt-4 border-t border-slate-100 space-y-4">
+                    <h4 className="text-xs font-bold text-violet-600 uppercase tracking-wider">Work Center</h4>
+
                     {request.status === 'TECHNICIAN_ASSIGNED' && (
                       <div className="flex gap-2">
-                        <button
-                          onClick={() => handleWorkflowAction(`/api/work-orders?action=accept&id=${id}`)}
-                          className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all"
-                        >
-                          Accept Assignment
-                        </button>
-                        <button
-                          onClick={() => {
-                            const reason = prompt('Please enter decline reason:')
-                            if (reason) handleWorkflowAction(`/api/work-orders?action=decline&id=${id}`, { reason })
-                          }}
-                          className="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all"
-                        >
-                          Decline Assignment
-                        </button>
+                        <ActionButton variant="success" onClick={() => handleWorkflowAction(`/api/work-orders?action=accept&id=${id}`, {}, 'Accept this assignment?')} loading={actionLoading}>Accept</ActionButton>
+                        <ActionButton variant="danger" onClick={() => {
+                          const reason = prompt('Decline reason:')
+                          if (reason) handleWorkflowAction(`/api/work-orders?action=decline&id=${id}`, { reason })
+                        }} loading={actionLoading}>Decline</ActionButton>
                       </div>
                     )}
 
                     {['WORK_ACCEPTED', 'PAUSED'].includes(request.status) && (
-                      <button
-                        onClick={() => handleWorkflowAction(`/api/work-orders?action=start&id=${id}`)}
-                        className="bg-violet-600 hover:bg-violet-750 text-white px-5 py-2 rounded-lg text-xs font-bold transition-all"
-                      >
-                        Start Executing Work
-                      </button>
+                      <ActionButton onClick={() => handleWorkflowAction(`/api/work-orders?action=start&id=${id}`, {}, 'Start work?')} loading={actionLoading}>Start Work</ActionButton>
                     )}
 
                     {['IN_PROGRESS', 'ADDITIONAL_COST_PENDING'].includes(request.status) && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 bg-slate-50 border border-slate-200 rounded-xl space-y-4 md:space-y-0">
-                        
-                        <div className="space-y-4">
-                          <h5 className="text-xs font-bold text-slate-800">Log Job Updates</h5>
-                          
-                          <div className="grid grid-cols-4 gap-2 items-center">
-                            <input 
-                              type="number" 
-                              placeholder="%"
-                              value={progressPercent}
-                              onChange={(e) => setProgressPercent(e.target.value)}
-                              className="col-span-1 bg-white border border-slate-200 rounded p-1.5 text-xs text-slate-800 focus:outline-none"
-                            />
-                            <input 
-                              type="text" 
-                              placeholder="Update note..."
-                              value={progressNote}
-                              onChange={(e) => setProgressNote(e.target.value)}
-                              className="col-span-3 bg-white border border-slate-200 rounded p-1.5 text-xs text-slate-800 focus:outline-none"
-                            />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 bg-slate-50 border border-slate-200 rounded-xl">
+                        <div className="space-y-3">
+                          <h5 className="text-xs font-bold text-slate-800">Progress Update</h5>
+                          <div className="grid grid-cols-4 gap-2">
+                            <input type="number" placeholder="%" value={progressPercent} onChange={e => setProgressPercent(e.target.value)} className="bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none" />
+                            <input type="text" placeholder="Note..." value={progressNote} onChange={e => setProgressNote(e.target.value)} className="col-span-3 bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none" />
                           </div>
+                          <ActionButton variant="ghost" onClick={() => handleWorkflowAction(`/api/work-orders?action=update&id=${id}`, { progressPercent, note: progressNote })} loading={actionLoading} className="text-[10px] py-1.5">Post Update</ActionButton>
 
-                          <button
-                            onClick={() => handleWorkflowAction(`/api/work-orders?action=update&id=${id}`, { progressPercent, note: progressNote })}
-                            className="bg-violet-50 hover:bg-violet-100 border border-violet-150 text-violet-750 px-3 py-1.5 rounded text-[10px] font-bold"
-                          >
-                            Post Progress Update
-                          </button>
-
-                          <div className="border-t border-slate-200 pt-4 space-y-2">
-                            <h5 className="text-xs font-bold text-slate-800">Add Material Usage</h5>
-                            <input 
-                              type="text" 
-                              placeholder="Material name..."
-                              value={materialDesc}
-                              onChange={(e) => setMaterialDesc(e.target.value)}
-                              className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs text-slate-800 focus:outline-none"
-                            />
+                          <div className="border-t border-slate-200 pt-3 space-y-2">
+                            <h5 className="text-xs font-bold text-slate-800">Add Material</h5>
+                            <input type="text" placeholder="Material name..." value={materialDesc} onChange={e => setMaterialDesc(e.target.value)} className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none" />
                             <div className="grid grid-cols-2 gap-2">
-                              <input 
-                                type="number" 
-                                placeholder="Qty"
-                                value={materialQty}
-                                onChange={(e) => setMaterialQty(e.target.value)}
-                                className="bg-white border border-slate-200 rounded p-1.5 text-xs text-slate-800 focus:outline-none"
-                              />
-                              <input 
-                                type="number" 
-                                placeholder="Cost per unit (₹)"
-                                value={materialUnitCost}
-                                onChange={(e) => setMaterialUnitCost(e.target.value)}
-                                className="bg-white border border-slate-200 rounded p-1.5 text-xs text-slate-800 focus:outline-none"
-                              />
+                              <input type="number" placeholder="Qty" value={materialQty} onChange={e => setMaterialQty(e.target.value)} className="bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none" />
+                              <input type="number" placeholder="Cost/unit ₹" value={materialUnitCost} onChange={e => setMaterialUnitCost(e.target.value)} className="bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none" />
                             </div>
-                            <button
-                              onClick={() => handleWorkflowAction(`/api/work-orders?action=material&id=${id}`, { description: materialDesc, quantity: materialQty, unit: materialUnit, unitCost: materialUnitCost })}
-                              className="bg-violet-50 hover:bg-violet-100 border border-violet-150 text-violet-750 px-3 py-1.5 rounded text-[10px] font-bold"
-                            >
-                              Add Material Line
-                            </button>
+                            <ActionButton variant="ghost" onClick={() => handleWorkflowAction(`/api/work-orders?action=material&id=${id}`, { description: materialDesc, quantity: materialQty, unit: materialUnit, unitCost: materialUnitCost })} loading={actionLoading} className="text-[10px] py-1.5">Add Material</ActionButton>
                           </div>
                         </div>
 
-                        <div className="space-y-4">
-                          <h5 className="text-xs font-bold text-slate-800">Request Extra Budget</h5>
-                          <input 
-                            type="text" 
-                            placeholder="Reason for extra cost..."
-                            value={costReason}
-                            onChange={(e) => setCostReason(e.target.value)}
-                            className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs text-slate-800 focus:outline-none"
-                          />
-                          <input 
-                            type="number" 
-                            placeholder="Amount (₹)"
-                            value={costSubtotal}
-                            onChange={(e) => setCostSubtotal(e.target.value)}
-                            className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs text-slate-800 focus:outline-none"
-                          />
-                          <button
-                            onClick={() => handleWorkflowAction(`/api/work-orders?action=additional-cost&id=${id}`, { reason: costReason, subtotal: costSubtotal, taxTotal: costTax })}
-                            className="bg-violet-50 hover:bg-violet-100 border border-violet-150 text-violet-750 px-3 py-1.5 rounded text-[10px] font-bold"
-                          >
-                            Submit Cost Request
-                          </button>
+                        <div className="space-y-3">
+                          <h5 className="text-xs font-bold text-slate-800">Extra Budget</h5>
+                          <input type="text" placeholder="Reason..." value={costReason} onChange={e => setCostReason(e.target.value)} className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none" />
+                          <input type="number" placeholder="Amount ₹" value={costSubtotal} onChange={e => setCostSubtotal(e.target.value)} className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none" />
+                          <ActionButton variant="ghost" onClick={() => handleWorkflowAction(`/api/work-orders?action=additional-cost&id=${id}`, { reason: costReason, subtotal: costSubtotal, taxTotal: costTax })} loading={actionLoading} className="text-[10px] py-1.5">Submit Cost Request</ActionButton>
 
-                          <div className="border-t border-slate-200 pt-4 space-y-2">
-                            <h5 className="text-xs font-bold text-slate-800">Complete Operations</h5>
-                            <textarea
-                              rows={2}
-                              placeholder="Enter completion summary notes..."
-                              value={completionSummary}
-                              onChange={(e) => setCompletionSummary(e.target.value)}
-                              className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs text-slate-800 focus:outline-none resize-none"
-                            />
-                            <button
-                              onClick={() => handleWorkflowAction(`/api/work-orders?action=complete&id=${id}`, { summary: completionSummary, warrantyDetails: completionWarranty, recommendations: completionRecs })}
-                              className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all w-full"
-                            >
-                              Dispatch Completion Report
-                            </button>
+                          <div className="border-t border-slate-200 pt-3 space-y-2">
+                            <h5 className="text-xs font-bold text-slate-800">Complete</h5>
+                            <textarea rows={2} placeholder="Summary..." value={completionSummary} onChange={e => setCompletionSummary(e.target.value)} className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs focus:outline-none resize-none" />
+                            <ActionButton variant="success" onClick={() => handleWorkflowAction(`/api/work-orders?action=complete&id=${id}`, { summary: completionSummary, warrantyDetails: completionWarranty, recommendations: completionRecs }, 'Mark as complete?')} loading={actionLoading} className="w-full">
+                              Complete Work
+                            </ActionButton>
                           </div>
                         </div>
-
                       </div>
                     )}
                   </div>
                 )}
               </div>
             ) : (
-              <div className="text-center py-8 text-slate-400 text-xs">
-                No work order raised yet. Wait for budget quotation approval.
-              </div>
+              <div className="text-center py-8 text-slate-400 text-xs">No work order yet.</div>
             )}
-
           </div>
         )}
 
-        {/* INVOICE TAB */}
+        {/* INVOICE */}
         {activeTab === 'Invoice' && (
           <div className="space-y-6">
-            
-            {/* Admin Invoice approval options */}
-            {auth.role === 'admin' && request.status === 'INVOICE_SUBMITTED' && (
+            {auth?.role === 'admin' && request.status === 'INVOICE_SUBMITTED' && (
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 text-left">
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Admin Invoice Review Portal</h3>
-                
-                <textarea
-                  rows={2}
-                  placeholder="Enter invoice decision notes or revision comments..."
-                  value={adminComment}
-                  onChange={(e) => setAdminComment(e.target.value)}
-                  className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-slate-800 placeholder-slate-400 text-sm focus:outline-none resize-none"
-                />
-
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Invoice Review</h3>
+                <textarea rows={2} placeholder="Notes..." value={adminComment} onChange={e => setAdminComment(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none resize-none" />
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => handleWorkflowAction(`/api/invoices?action=approve&id=${id}`, { comment: adminComment })}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all"
-                  >
-                    Approve Invoice
-                  </button>
-                  <button
-                    onClick={() => handleWorkflowAction(`/api/invoices?action=revise&id=${id}`, { comment: adminComment })}
-                    className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all"
-                  >
-                    Request Invoice Revision
-                  </button>
-                  <button
-                    onClick={() => handleWorkflowAction(`/api/invoices?action=reject&id=${id}`, { comment: adminComment })}
-                    className="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all"
-                  >
-                    Reject Invoice
-                  </button>
+                  <ActionButton variant="success" onClick={() => handleWorkflowAction(`/api/invoices?action=approve&id=${id}`, { comment: adminComment }, 'Approve invoice?')} loading={actionLoading}>Approve</ActionButton>
+                  <ActionButton variant="primary" onClick={() => handleWorkflowAction(`/api/invoices?action=revise&id=${id}`, { comment: adminComment })} loading={actionLoading}>Revision</ActionButton>
+                  <ActionButton variant="danger" onClick={() => handleWorkflowAction(`/api/invoices?action=reject&id=${id}`, { comment: adminComment }, 'Reject invoice?')} loading={actionLoading}>Reject</ActionButton>
                 </div>
               </div>
             )}
 
-            {/* Display Invoice */}
-            {request.invoice && request.invoice.invoiceNumber ? (
+            {request.invoice?.invoiceNumber ? (
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5 text-left">
                 <div className="flex justify-between items-center pb-3 border-b border-slate-100">
                   <div>
-                    <span className="text-xs text-slate-400 font-mono">Invoice Summary</span>
-                    <h3 className="text-base font-bold text-slate-800">{request.invoice.invoiceNumber} (v{request.invoice.version})</h3>
+                    <span className="text-xs text-slate-400 font-mono">{request.invoice.invoiceNumber}</span>
+                    <h3 className="text-base font-bold text-slate-800">v{request.invoice.version}</h3>
                   </div>
-
-                  <button
-                    onClick={() => openPdf('invoice')}
-                    className="flex items-center space-x-1.5 bg-violet-50 hover:bg-violet-100 border border-violet-150 text-violet-750 px-4 py-2 rounded-lg text-xs font-bold transition-all"
-                  >
-                    <Download size={14} />
-                    <span>Download PDF</span>
-                  </button>
+                  <ActionButton variant="ghost" onClick={() => openPdf('invoice')}><Download size={14} /> PDF</ActionButton>
                 </div>
-
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm text-slate-700">
+                  <table className="w-full text-left text-sm">
                     <thead>
-                      <tr className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
-                        <th className="pb-2">Description</th>
-                        <th className="pb-2 text-right">Quantity</th>
-                        <th className="pb-2 text-right">Unit Price</th>
-                        <th className="pb-2 text-right">Total</th>
+                      <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                        <th className="pb-2">Description</th><th className="pb-2 text-right">Qty</th><th className="pb-2 text-right">Price</th><th className="pb-2 text-right">Total</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {request.invoice.items.map((item, idx) => (
                         <tr key={idx}>
                           <td className="py-2.5 font-semibold text-slate-800">{item.description}</td>
-                          <td className="py-2.5 text-right">{item.quantity} {item.unit}</td>
-                          <td className="py-2.5 text-right">₹{item.unitPrice.toFixed(2)}</td>
-                          <td className="py-2.5 text-right font-bold text-slate-800">₹{item.lineTotal.toFixed(2)}</td>
+                          <td className="py-2.5 text-right text-xs">{item.quantity} {item.unit}</td>
+                          <td className="py-2.5 text-right text-xs">₹{item.unitPrice.toFixed(2)}</td>
+                          <td className="py-2.5 text-right font-bold text-slate-800 text-xs">₹{item.lineTotal.toFixed(2)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-
-                <div className="flex justify-end pt-4 border-t border-slate-100 text-sm font-semibold text-slate-700">
-                  <div className="space-y-1.5 text-right">
-                    <div>Subtotal: ₹{request.invoice.subtotal.toFixed(2)}</div>
-                    <div>Tax: ₹{request.invoice.taxTotal.toFixed(2)}</div>
-                    <div className="text-violet-700 text-base font-bold">Total Amount Due: ₹{request.invoice.grandTotal.toFixed(2)}</div>
-                    <div className="text-emerald-600 font-bold">Balance Due: ₹{request.invoice.balanceDue.toFixed(2)}</div>
+                <div className="flex justify-end pt-4 border-t border-slate-100 text-sm">
+                  <div className="space-y-1 text-right">
+                    <div className="text-xs text-slate-500">Subtotal: ₹{request.invoice.subtotal.toFixed(2)}</div>
+                    <div className="text-xs text-slate-500">Tax: ₹{request.invoice.taxTotal.toFixed(2)}</div>
+                    <div className="text-violet-700 font-bold">Due: ₹{request.invoice.grandTotal.toFixed(2)}</div>
+                    <div className="text-emerald-600 font-bold text-xs">Balance: ₹{request.invoice.balanceDue.toFixed(2)}</div>
                   </div>
                 </div>
-
-                {auth.role === 'manager' && request.status === 'INVOICE_IN_PROGRESS' && (
-                  <button
-                    onClick={() => handleWorkflowAction(`/api/invoices?action=submit&id=${id}`)}
-                    className="bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs py-2.5 px-6 rounded-lg transition-all"
-                  >
-                    Submit Invoice for Approval
-                  </button>
+                {auth?.role === 'manager' && request.status === 'INVOICE_IN_PROGRESS' && (
+                  <ActionButton onClick={() => handleWorkflowAction(`/api/invoices?action=submit&id=${id}`, {}, 'Submit invoice?')} loading={actionLoading}>Submit Invoice</ActionButton>
                 )}
               </div>
             ) : null}
 
-            {/* Invoice Builder (visible to managers) */}
-            {auth.role === 'manager' && 
-             (['SERVICE_VERIFIED', 'INVOICE_REVISION_REQUIRED'].includes(request.status) || !request.invoice) && (
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6 text-left">
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Generate Service Invoice</h3>
-                <p className="text-xs text-slate-500">Generates invoice importing quotation line items and recording actuals.</p>
-
-                <button
-                  onClick={() => {
-                    const items = []
-                    if (request.quotation) {
-                      request.quotation.items.forEach(i => items.push({ description: i.description, quantity: i.quantity, unit: i.unit, unitPrice: i.unitPrice, taxRate: i.taxRate }))
-                    }
-                    if (request.workOrder && request.workOrder.materials) {
-                      request.workOrder.materials.forEach(m => items.push({ description: `Material: ${m.description}`, quantity: m.quantity, unit: m.unit, unitPrice: m.unitCost }))
-                    }
-                    
-                    handleWorkflowAction(`/api/invoices?requestId=${id}`, { items })
-                  }}
-                  className="bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs py-2.5 px-6 rounded-lg transition-all"
-                >
-                  Import Quotation Details & Draft Invoice
-                </button>
+            {auth?.role === 'manager' && ['SERVICE_VERIFIED', 'INVOICE_REVISION_REQUIRED'].includes(request.status) && (
+              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 text-left">
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Generate Invoice</h3>
+                <ActionButton onClick={() => {
+                  const items = []
+                  if (request.quotation) request.quotation.items.forEach(i => items.push({ description: i.description, quantity: i.quantity, unit: i.unit, unitPrice: i.unitPrice, taxRate: i.taxRate }))
+                  if (request.workOrder?.materials) request.workOrder.materials.forEach(m => items.push({ description: `Material: ${m.description}`, quantity: m.quantity, unit: m.unit, unitPrice: m.unitCost }))
+                  handleWorkflowAction(`/api/invoices?requestId=${id}`, { items }, 'Import quotation & create invoice?')
+                }} loading={actionLoading}>
+                  Import & Draft Invoice
+                </ActionButton>
               </div>
             )}
-
           </div>
         )}
 
-        {/* PAYMENTS TAB */}
+        {/* PAYMENTS */}
         {activeTab === 'Payments' && (
           <div className="space-y-6">
-            
-            {/* Record Payment Form */}
-            {auth.role === 'accounts' && ['PAYMENT_PENDING', 'PARTIALLY_PAID'].includes(request.status) && (
+            {(auth?.role === 'accounts' || auth?.role === 'admin') && ['PAYMENT_PENDING', 'PARTIALLY_PAID'].includes(request.status) && request.invoice?.status === 'APPROVED' && (
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 text-left">
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Record Transaction Payment</h3>
-
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Record Payment</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-2">Payment Amount (₹)</label>
-                    <input 
-                      type="number" 
-                      value={payAmount}
-                      onChange={(e) => setPayAmount(e.target.value)}
-                      className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-slate-800 text-sm focus:outline-none"
-                    />
+                    <label className="block text-xs font-bold text-slate-600 mb-2">Amount (₹)</label>
+                    <input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none" />
                   </div>
-
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-2">Method</label>
-                    <select
-                      value={payMethod}
-                      onChange={(e) => setPayMethod(e.target.value)}
-                      className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-slate-700 text-sm focus:outline-none"
-                    >
-                      <option value="CASH">Cash</option>
-                      <option value="BANK_TRANSFER">Bank Transfer</option>
-                      <option value="CHEQUE">Cheque</option>
+                    <select value={payMethod} onChange={e => setPayMethod(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none">
+                      <option value="CASH">Cash</option><option value="BANK_TRANSFER">Bank Transfer</option><option value="CHEQUE">Cheque</option>
                     </select>
                   </div>
-
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-2">Reference Number</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. UTR123456789"
-                      value={payRef}
-                      onChange={(e) => setPayRef(e.target.value)}
-                      className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-slate-800 text-sm focus:outline-none"
-                    />
+                    <label className="block text-xs font-bold text-slate-600 mb-2">Reference</label>
+                    <input type="text" placeholder="Ref number..." value={payRef} onChange={e => setPayRef(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none" />
                   </div>
                 </div>
-
-                <button
-                  onClick={() => handleWorkflowAction(`/api/payments?id=${id}`, { amount: payAmount, method: payMethod, referenceNumber: payRef, notes: payNotes })}
-                  className="bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs py-2.5 px-6 rounded-lg transition-all"
-                >
-                  Record Payment & Clear Invoice
-                </button>
+                <ActionButton onClick={() => handleWorkflowAction(`/api/payments?id=${id}`, { amount: payAmount, method: payMethod, referenceNumber: payRef, notes: payNotes }, 'Record payment?')} loading={actionLoading}>
+                  Record Payment
+                </ActionButton>
               </div>
             )}
 
-            {/* List recorded payments */}
-            {request.payments && request.payments.length > 0 ? (
+            {request.payments?.length > 0 ? (
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 text-left">
                 <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Transaction History Logs</h3>
-                  <button
-                    onClick={() => openPdf('receipt')}
-                    className="flex items-center space-x-1.5 bg-violet-50 hover:bg-violet-100 border border-violet-150 text-violet-750 px-4 py-2 rounded-lg text-xs font-bold transition-all"
-                  >
-                    <Download size={14} />
-                    <span>Download Last Receipt</span>
-                  </button>
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Payment History</h3>
+                  <ActionButton variant="ghost" onClick={() => openPdf('receipt')}><Download size={14} /> Receipt</ActionButton>
                 </div>
-
-                <ul className="divide-y divide-slate-50">
-                  {request.payments.map((p) => (
-                    <li key={p._id} className="py-3 flex justify-between items-center text-sm text-slate-700">
+                <div className="space-y-3">
+                  {request.payments.map(p => (
+                    <div key={p._id} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-100 rounded-lg">
                       <div>
-                        <div className="font-bold text-slate-800">{p.paymentNumber}</div>
-                        <div className="text-[10px] text-slate-400">Method: {p.method} | Ref: {p.referenceNumber || 'None'}</div>
+                        <div className="font-bold text-slate-800 text-xs">{p.paymentNumber}</div>
+                        <div className="text-[10px] text-slate-400">{p.method} · {p.referenceNumber || 'N/A'}</div>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold text-emerald-600">₹{p.amount.toFixed(2)}</div>
+                        <div className="font-bold text-emerald-600 text-sm">₹{p.amount.toFixed(2)}</div>
                         <div className="text-[10px] text-slate-400">{new Date(p.paidAt).toLocaleDateString()}</div>
                       </div>
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             ) : (
-              <div className="text-center py-8 text-slate-400 text-xs">
-                No payment transactions recorded yet.
-              </div>
+              <div className="text-center py-8 text-slate-400 text-xs">No payments recorded.</div>
             )}
           </div>
         )}
 
-        {/* AUDIT LOG TAB */}
+        {/* HISTORY */}
         {activeTab === 'History' && (
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 text-left animate-fadeIn">
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-100">Audit Trail History</h3>
-            
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 text-left">
+            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-100">Audit Trail</h3>
             <div className="space-y-4 relative pl-4 before:absolute before:left-1.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
-              {request.statusHistory.map((h, idx) => (
+              {request.statusHistory?.map((h, idx) => (
                 <div key={idx} className="relative space-y-1">
-                  <div className="absolute -left-[19px] top-1.5 h-2 w-2 rounded-full bg-violet-600 ring-4 ring-white"></div>
-                  
+                  <div className="absolute -left-[19px] top-1.5 h-2 w-2 rounded-full bg-violet-600 ring-4 ring-white" />
                   <div className="flex justify-between text-[11px] text-slate-400">
                     <span className="font-bold text-violet-600 uppercase tracking-wide">{h.newStatus.replace(/_/g, ' ')}</span>
-                    <span>{new Date(h.createdAt).toLocaleString()}</span>
+                    <span>{formatDistanceToNow(new Date(h.createdAt), { addSuffix: true })}</span>
                   </div>
                   <div className="text-sm text-slate-700">
-                    <span className="font-bold text-slate-800">{h.actorName}</span>: {h.comment || 'Status modified'}
+                    <span className="font-bold text-slate-800">{h.actorName}</span>: {h.comment || 'Status updated'}
                   </div>
                 </div>
               ))}
+              {(!request.statusHistory || request.statusHistory.length === 0) && (
+                <div className="text-center py-6 text-slate-400 text-xs">No history records.</div>
+              )}
             </div>
           </div>
         )}
-
       </div>
     </div>
   )

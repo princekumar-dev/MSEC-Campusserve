@@ -12,8 +12,15 @@ import {
   getNotificationPermission,
   checkCurrentSubscription
 } from '../utils/notifications'
-import { processSignatureImage, validateSignatureFile, optimizeSignatureForPDF } from '../utils/signatureProcessor'
-import StaffWhatsAppSettingsCard from './StaffWhatsAppSettingsCard'
+// Signature processing utilities
+const processSignatureImage = async (dataUrl) => dataUrl
+const validateSignatureFile = (file) => {
+  if (!file) return { valid: false, error: 'No file selected' }
+  if (file.size > 2 * 1024 * 1024) return { valid: false, error: 'File must be under 2MB' }
+  if (!['image/jpeg', 'image/png'].includes(file.type)) return { valid: false, error: 'Only JPEG or PNG allowed' }
+  return { valid: true }
+}
+const optimizeSignatureForPDF = async (dataUrl) => dataUrl
 
 function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
   const navigate = useNavigate()
@@ -536,30 +543,8 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
   // ============ RENDER ============
 
   const SettingsContent = () => {
-    // Get student name from localStorage for display
-    const displayName = (() => {
-      if (userRole === 'student') {
-        try {
-          const auth = JSON.parse(localStorage.getItem('auth') || '{}')
-          return auth?.name || userEmail
-        } catch {
-          return userEmail
-        }
-      }
-      return userEmail
-    })()
-
-    const displayInitial = (() => {
-      if (userRole === 'student') {
-        try {
-          const auth = JSON.parse(localStorage.getItem('auth') || '{}')
-          return auth?.name?.charAt(0).toUpperCase() || 'S'
-        } catch {
-          return 'S'
-        }
-      }
-      return userEmail?.charAt(0).toUpperCase() || '?'
-    })()
+    const displayName = userEmail
+    const displayInitial = userEmail?.charAt(0).toUpperCase() || '?'
 
     return (
       <>
@@ -596,16 +581,15 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
 
   const SettingsBody = () => (
     <div className="px-3 sm:px-4 py-3 sm:py-4 space-y-2 sm:space-y-3 flex-1 overflow-y-auto overflow-x-hidden smooth-scroll settings-content" style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain', touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent', scrollBehavior: 'smooth', width: '100%', boxSizing: 'border-box' }}>
-      {/* Account Section - Hide signature for students */}
-      {userRole !== 'student' && (
-        <div>
-          <h4 className="text-sm font-semibold text-[#111418] group-hover:text-[#0b1220] mb-2 flex items-center gap-2 transition-colors duration-200">
-            <svg className="w-4 h-4 group-hover:text-violet-600 transition-colors duration-200" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-            </svg>
-            Account
-          </h4>
-          <div className="space-y-1">
+      {/* Account Section */}
+      <div>
+        <h4 className="text-sm font-semibold text-[#111418] group-hover:text-[#0b1220] mb-2 flex items-center gap-2 transition-colors duration-200">
+          <svg className="w-4 h-4 group-hover:text-violet-600 transition-colors duration-200" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+          </svg>
+          Account
+        </h4>
+        <div className="space-y-1">
             <button
               type="button"
               onClick={(e) => {
@@ -650,44 +634,6 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
             </button>
           </div>
         </div>
-      )}
-
-      {/* Student-only info section */}
-      {userRole === 'student' && (
-        <div>
-          <h4 className="text-sm font-semibold text-[#111418] group-hover:text-[#0b1220] mb-2 flex items-center gap-2 transition-colors duration-200">
-            <svg className="w-4 h-4 group-hover:text-violet-600 transition-colors duration-200" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-            </svg>
-            Account
-          </h4>
-          <div className="space-y-2">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                setShowPasswordModal(true)
-                setPasswordError('')
-              }}
-              className="w-full flex items-center gap-3 p-3 rounded-lg bg-white/6 hover:bg-white/12 hover:shadow-sm active:bg-white/5 transition-all duration-200 text-left min-h-[52px] cursor-pointer group"
-              style={{ touchAction: 'manipulation', pointerEvents: 'auto' }}
-            >
-              <svg className="w-4 h-4 text-[#60758a] group-hover:text-[#4a5568] flex-shrink-0 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-[#111418] group-hover:text-[#0b1220] transition-colors duration-200">Change Password</p>
-                <p className="text-xs text-[#60758a] group-hover:text-[#4a5568] mt-0.5 transition-colors duration-200">Update your login password</p>
-              </div>
-              <svg className="w-4 h-4 text-[#60758a] group-hover:text-[#4a5568] group-hover:translate-x-1 flex-shrink-0 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {userRole === 'staff' && <StaffWhatsAppSettingsCard />}
 
       {/* Notifications Section */}
       <div className="border-t border-[#e7edf4] pt-3">

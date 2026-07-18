@@ -70,6 +70,9 @@ function Login() {
             <div>
               <label className="mb-3 block text-sm font-bold text-white">Password</label>
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" placeholder="Enter your password" className="w-full rounded-xl border border-white/30 bg-white/20 px-4 py-3 text-white outline-none backdrop-blur-sm transition-all duration-200 placeholder:text-gray-200 focus:ring-2 focus:ring-violet-300 sm:rounded-2xl sm:py-4" required />
+              <div className="mt-2 text-right">
+                <Link to="/forgot-password" className="text-xs font-semibold text-violet-300 hover:underline">Forgot password?</Link>
+              </div>
             </div>
             <div className="pt-4">
               <button type="submit" disabled={isLoading} className="glass-button w-full rounded-xl px-6 py-3.5 text-base font-bold text-violet-600 transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-50 sm:rounded-2xl sm:py-4 sm:text-lg">

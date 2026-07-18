@@ -307,6 +307,20 @@ router.get('/vapid-public-key', (req, res) => {
   res.json({ success: true, publicKey: VAPID_PUBLIC_KEY })
 })
 
+// Get unread notification count (used by Header bell)
+router.get('/', async (req, res, next) => {
+  if (req.query.action === 'count') {
+    try {
+      const userEmail = req.headers['x-user-email']
+      if (!userEmail) return res.json({ success: true, unreadCount: 0 })
+      const result = await getUserNotifications(userEmail, 100)
+      const unread = (result.notifications || []).filter(n => !n.read).length
+      return res.json({ success: true, unreadCount: unread })
+    } catch (err) { return res.json({ success: true, unreadCount: 0 }) }
+  }
+  next()
+})
+
 // Get notifications for a user (query param)
 router.get('/', async (req, res) => {
   try {

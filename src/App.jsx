@@ -23,9 +23,32 @@ const CreateRequest = lazy(() => import('./pages/CreateRequest'))
 const Requests = lazy(() => import('./pages/Requests'))
 const RequestDetails = lazy(() => import('./pages/RequestDetails'))
 const Reports = lazy(() => import('./pages/Reports'))
+const AdminUsers = lazy(() => import('./pages/AdminUsers'))
+const AdminSettings = lazy(() => import('./pages/AdminSettings'))
+const AdminAudit = lazy(() => import('./pages/AdminAudit'))
 const Login = lazy(() => import('./pages/Login'))
 const SignUp = lazy(() => import('./pages/SignUp'))
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
 const NotFound = lazy(() => import('./pages/NotFound'))
+const Vendors = lazy(() => import('./pages/Vendors'))
+const PurchaseOrders = lazy(() => import('./pages/PurchaseOrders'))
+const PurchaseOrderDetails = lazy(() => import('./pages/PurchaseOrderDetails'))
+const Deliveries = lazy(() => import('./pages/Deliveries'))
+const GateScanner = lazy(() => import('./pages/GateScanner'))
+const GateDashboard = lazy(() => import('./pages/GateDashboard'))
+const GateHistory = lazy(() => import('./pages/GateHistory'))
+const GateVehicles = lazy(() => import('./pages/GateVehicles'))
+const GRN = lazy(() => import('./pages/GRN'))
+const VendorDashboard = lazy(() => import('./pages/VendorDashboard'))
+const VendorInvoices = lazy(() => import('./pages/VendorInvoices'))
+const VendorPayments = lazy(() => import('./pages/VendorPayments'))
+const ReceivingDashboard = lazy(() => import('./pages/ReceivingDashboard'))
+const ReceivingDamaged = lazy(() => import('./pages/ReceivingDamaged'))
+const AccountsDashboard = lazy(() => import('./pages/AccountsDashboard'))
+const AccountsPayments = lazy(() => import('./pages/AccountsPayments'))
+const ManagerQuotations = lazy(() => import('./pages/ManagerQuotations'))
+const ManagerDeliveryPersons = lazy(() => import('./pages/ManagerDeliveryPersons'))
+const ManagerVehicles = lazy(() => import('./pages/ManagerVehicles'))
 
 // Root route handler
 const RootRedirect = () => {
@@ -34,13 +57,18 @@ const RootRedirect = () => {
   return <Navigate to="/dashboard" replace />
 }
 
-// Protected route wrapper
-const ProtectedRoute = ({ children }) => {
+// Protected route wrapper with optional role checks
+const ProtectedRoute = ({ children, allowedRoles }) => {
   const parsed = getAuthOrNull()
   if (!parsed || !parsed.isAuthenticated) {
     clearStoredAuth()
     return <Navigate to="/login" replace />
   }
+  
+  if (allowedRoles && !allowedRoles.includes(parsed.role)) {
+    return <Navigate to="/dashboard" replace />
+  }
+  
   return children
 }
 
@@ -56,6 +84,8 @@ const RedirectIfAuthenticated = ({ children }) => {
 function AppContent() {
   const location = useLocation()
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup'
+  const auth = getAuthOrNull()
+  const roleClass = auth?.role ? `role-${auth.role}` : '' || location.pathname === '/forgot-password'
 
   // A modal or interrupted navigation can leave an inline scroll lock behind.
   // Pages use normal window scrolling, so always release that lock on route changes.
@@ -145,30 +175,79 @@ function AppContent() {
       <div
         className={`flex w-full flex-col ${isAuthPage ? 'relative auth-wrapper' : ''}`}
         style={{
-          fontFamily: "'Plus Jakarta Sans', 'Outfit', sans-serif",
           minHeight: '100vh'
         }}
       >
         {isAuthPage && <div className="pointer-events-none fixed inset-0 z-0 bg-black/40" />}
-        <div className={`layout-container flex min-h-screen flex-col max-w-full ${isAuthPage ? 'relative z-10' : 'bg-[#FAF7F0] text-slate-800'}`}>
+        <div className={`layout-container flex min-h-screen flex-col max-w-full ${isAuthPage ? 'relative z-10' : `app-shell text-slate-800 ${roleClass}`}`}>
           <Header />
           <main className="flex w-full flex-1 justify-center">
-            <div className={`layout-content-container flex w-full max-w-7xl flex-col px-4 py-6 ${!isAuthPage ? 'pb-24 md:pb-6' : ''}`}>
+            <div className={`layout-content-container flex w-full max-w-7xl flex-col px-4 py-6 page-enter ${!isAuthPage ? 'pb-24 md:pb-6' : ''}`}>
               <Suspense fallback={
                 <div className="flex items-center justify-center min-h-[50vh]">
-                  <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-violet-500"></div>
+                  <div className="premium-spinner"></div>
                 </div>
               }>
                 <Routes>
                   <Route path="/" element={<RootRedirect />} />
-                  <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                  <Route path="/requests" element={<ProtectedRoute><Requests /></ProtectedRoute>} />
-                  <Route path="/requests/new" element={<ProtectedRoute><CreateRequest /></ProtectedRoute>} />
-                  <Route path="/requests/:id" element={<ProtectedRoute><RequestDetails /></ProtectedRoute>} />
-                  <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
                   
+                  {/* Dashboard - all authenticated users */}
+                  <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                  
+                  {/* Requester / Shared routes */}
+                  <Route path="/requests" element={<ProtectedRoute><Requests /></ProtectedRoute>} />
+                  <Route path="/requests/new" element={<ProtectedRoute allowedRoles={['requester', 'admin', 'super_admin', 'hod', 'staff']}><CreateRequest /></ProtectedRoute>} />
+                  <Route path="/requests/:id" element={<ProtectedRoute><RequestDetails /></ProtectedRoute>} />
+                  
+                  {/* Reports */}
+                  <Route path="/reports" element={<ProtectedRoute allowedRoles={['admin', 'super_admin', 'manager', 'accounts', 'requester', 'hod', 'staff']}><Reports /></ProtectedRoute>} />
+                  
+                  {/* Admin routes */}
+                  <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminUsers /></ProtectedRoute>} />
+                  <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminSettings /></ProtectedRoute>} />
+                  <Route path="/admin/audit" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminAudit /></ProtectedRoute>} />
+                  
+                  {/* Vendor routes */}
+                  <Route path="/vendors" element={<ProtectedRoute allowedRoles={['admin', 'super_admin', 'manager']}><Vendors /></ProtectedRoute>} />
+                  
+                  {/* Purchase Orders */}
+                  <Route path="/purchase-orders" element={<ProtectedRoute allowedRoles={['admin', 'super_admin', 'manager', 'vendor']}><PurchaseOrders /></ProtectedRoute>} />
+                  <Route path="/purchase-orders/:id" element={<ProtectedRoute allowedRoles={['admin', 'super_admin', 'manager', 'vendor']}><PurchaseOrderDetails /></ProtectedRoute>} />
+                  
+                  {/* Delivery routes */}
+                  <Route path="/deliveries" element={<ProtectedRoute allowedRoles={['admin', 'super_admin', 'manager', 'receiving_officer', 'vendor']}><Deliveries /></ProtectedRoute>} />
+                  
+                  {/* Gate routes */}
+                  <Route path="/gate" element={<ProtectedRoute allowedRoles={['admin', 'super_admin', 'gate']}><GateScanner /></ProtectedRoute>} />
+                  <Route path="/gate/dashboard" element={<ProtectedRoute allowedRoles={['admin', 'super_admin', 'gate']}><GateDashboard /></ProtectedRoute>} />
+                  <Route path="/gate/history" element={<ProtectedRoute allowedRoles={['admin', 'super_admin', 'gate']}><GateHistory /></ProtectedRoute>} />
+                  <Route path="/gate/vehicles" element={<ProtectedRoute allowedRoles={['admin', 'super_admin', 'gate']}><GateVehicles /></ProtectedRoute>} />
+                  
+                  {/* GRN routes */}
+                  <Route path="/grn" element={<ProtectedRoute allowedRoles={['admin', 'super_admin', 'manager', 'receiving_officer']}><GRN /></ProtectedRoute>} />
+                  
+                  {/* Vendor Portal */}
+                  <Route path="/vendor/dashboard" element={<ProtectedRoute allowedRoles={['vendor']}><VendorDashboard /></ProtectedRoute>} />
+                  <Route path="/vendor/invoices" element={<ProtectedRoute allowedRoles={['vendor']}><VendorInvoices /></ProtectedRoute>} />
+                  <Route path="/vendor/payments" element={<ProtectedRoute allowedRoles={['vendor']}><VendorPayments /></ProtectedRoute>} />
+                  
+                  {/* Receiving Officer routes */}
+                  <Route path="/receiving/dashboard" element={<ProtectedRoute allowedRoles={['admin', 'super_admin', 'receiving_officer']}><ReceivingDashboard /></ProtectedRoute>} />
+                  <Route path="/receiving/damaged" element={<ProtectedRoute allowedRoles={['admin', 'super_admin', 'receiving_officer']}><ReceivingDamaged /></ProtectedRoute>} />
+                  
+                  {/* Accounts routes */}
+                  <Route path="/accounts/dashboard" element={<ProtectedRoute allowedRoles={['admin', 'super_admin', 'accounts']}><AccountsDashboard /></ProtectedRoute>} />
+                  <Route path="/accounts/payments" element={<ProtectedRoute allowedRoles={['admin', 'super_admin', 'accounts']}><AccountsPayments /></ProtectedRoute>} />
+                  
+                  {/* Manager routes */}
+                  <Route path="/manager/quotations" element={<ProtectedRoute allowedRoles={['admin', 'super_admin', 'manager']}><ManagerQuotations /></ProtectedRoute>} />
+                  <Route path="/manager/delivery-persons" element={<ProtectedRoute allowedRoles={['admin', 'super_admin', 'manager']}><ManagerDeliveryPersons /></ProtectedRoute>} />
+                  <Route path="/manager/vehicles" element={<ProtectedRoute allowedRoles={['admin', 'super_admin', 'manager']}><ManagerVehicles /></ProtectedRoute>} />
+                  
+                  {/* Auth routes */}
                   <Route path="/login" element={<RedirectIfAuthenticated><Login /></RedirectIfAuthenticated>} />
                   <Route path="/signup" element={<RedirectIfAuthenticated><SignUp /></RedirectIfAuthenticated>} />
+                  <Route path="/forgot-password" element={<ForgotPassword />} />
                   
                   <Route path="*" element={<NotFound />} />
                 </Routes>

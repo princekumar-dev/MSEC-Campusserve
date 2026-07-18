@@ -1,5 +1,5 @@
 import { connectToDatabase } from './lib/mongo.js'
-import { User, Student, Marksheet, ImportSession, LeaveRequest, StaffApprovalRequest, AccessPolicy, ServiceRequest, Notification, WhatsappInstance } from './models.js'
+import { User, ServiceRequest, Notification, Vendor, PurchaseOrder, DeliverySchedule, GoodsReceipt, GateEntry } from './models.js'
 import bcrypt from 'bcryptjs'
 
 const campusUsers = [
@@ -50,6 +50,22 @@ const campusUsers = [
     role: 'super_admin',
     department: 'SYSTEM',
     phoneNumber: '+91-9876543200'
+  },
+  {
+    name: 'Gate Security Guard',
+    email: 'gate@msec.edu.in',
+    password: '123',
+    role: 'gate',
+    department: 'SECURITY',
+    phoneNumber: '+91-9876543206'
+  },
+  {
+    name: 'Receiving Officer Kumar',
+    email: 'receiving@msec.edu.in',
+    password: '123',
+    role: 'receiving_officer',
+    department: 'STORES',
+    phoneNumber: '+91-9876543207'
   }
 ]
 
@@ -231,14 +247,12 @@ async function seedAllUsers() {
     console.log('🧹 Clearing all existing users and all other collections...')
     await User.deleteMany({})
     await ServiceRequest.deleteMany({})
-    await Student.deleteMany({})
-    await Marksheet.deleteMany({})
-    await ImportSession.deleteMany({})
-    await LeaveRequest.deleteMany({})
-    await StaffApprovalRequest.deleteMany({})
-    await AccessPolicy.deleteMany({})
     await Notification.deleteMany({})
-    await WhatsappInstance.deleteMany({})
+    await Vendor.deleteMany({})
+    await PurchaseOrder.deleteMany({})
+    await DeliverySchedule.deleteMany({})
+    await GoodsReceipt.deleteMany({})
+    await GateEntry.deleteMany({})
     
     const allUsers = [...campusUsers, ...academicUsers]
     console.log(`🌱 Seeding ${allUsers.length} total demo users (Campus + Academic)...`)

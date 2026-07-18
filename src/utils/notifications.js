@@ -98,7 +98,7 @@ class PushNotificationManager {
       try {
         // For desktop browsers, use direct Notification API for immediate test
         const notification = new Notification('🎉 Notifications Enabled!', {
-          body: 'MSEC Academics notifications are working!\nYou will receive event reminders here.',
+          body: 'MSEC CampusServe notifications are working!\nYou will receive service request updates here.',
           icon: '/images/android-chrome-192x192.png',
           badge: '/images/favicon-32x32.png',
           tag: 'test-notification-' + Date.now(), // Unique tag to avoid replacement
@@ -130,7 +130,7 @@ class PushNotificationManager {
         // Fallback: try service worker method
         if (this.registration) {
           this.registration.showNotification('🎉 Notifications Enabled!', {
-            body: 'MSEC Academics notifications are working!',
+            body: 'MSEC CampusServe notifications are working!',
             icon: '/images/android-chrome-192x192.png',
             tag: 'test-notification-' + Date.now()
           });
@@ -365,7 +365,7 @@ class PushNotificationManager {
         icon: '/images/android-chrome-192x192.png',
         badge: '/images/favicon-32x32.png',
         vibrate: [200, 100, 200],
-        tag: 'msec-notification-' + Date.now(),
+        tag: 'campusserve-notification-' + Date.now(),
         requireInteraction: false,
         data: {},
         timestamp: Date.now()

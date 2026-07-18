@@ -13,7 +13,24 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const requests = await ServiceRequest.find({}).lean()
+      const userId = req.headers['x-user-id']
+      const userRole = req.headers['x-user-role']
+
+      // Build role-scoped filter
+      const filter = {}
+      if (userRole === 'manager') {
+        filter.$or = [
+          { assignedManagerId: userId },
+          { status: 'APPROVED' }
+        ]
+      } else if (userRole === 'technician') {
+        filter['workOrder.technicianId'] = userId
+      } else if (userRole === 'requester') {
+        filter.requesterId = userId
+      }
+      // admin, accounts, super_admin see all
+
+      const requests = await ServiceRequest.find(filter).lean()
 
       // Calculate stats
       const totalRequests = requests.length

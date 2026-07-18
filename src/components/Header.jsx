@@ -1,18 +1,19 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
-import { Bell, ChevronDown, ClipboardList, LogOut, Menu, PlusCircle, Search, X } from 'lucide-react'
+import { Bell, ChevronDown, ClipboardList, LogOut, Menu, PlusCircle, X, ShoppingCart, Building2, Truck, QrCode, ClipboardCheck } from 'lucide-react'
 import { getAuthOrNull } from '../utils/auth'
 import Settings from './Settings'
+import apiClient from '../utils/apiClient'
 
 function Header() {
   const location = useLocation()
   const navigate = useNavigate()
   const isAuthPage = ['/login', '/signup'].includes(location.pathname)
   const [user, setUser] = useState(null)
-  const [searchQuery, setSearchQuery] = useState('')
   const [showDropdown, setShowDropdown] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [notifCount, setNotifCount] = useState(0)
   const dropdownRef = useRef(null)
 
   useEffect(() => {
@@ -24,6 +25,19 @@ function Header() {
     window.addEventListener('authStateChanged', handleAuthChange)
     return () => window.removeEventListener('authStateChanged', handleAuthChange)
   }, [])
+
+  // Fetch notification count
+  useEffect(() => {
+    if (!user) return
+    const fetchCount = () => {
+      apiClient.get('/api/notifications?action=count').then(res => {
+        if (res.success) setNotifCount(res.unreadCount || 0)
+      }).catch(() => {})
+    }
+    fetchCount()
+    const interval = setInterval(fetchCount, 30000) // poll every 30s
+    return () => clearInterval(interval)
+  }, [user])
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -45,25 +59,107 @@ function Header() {
     navigate('/login')
   }
 
-  const handleSearchSubmit = (event) => {
-    event.preventDefault()
-    const query = searchQuery.trim()
-    if (query) navigate(`/requests?search=${encodeURIComponent(query)}`)
-  }
-
   const linkClass = (path) => {
     const active = location.pathname === path || (path === '/requests' && location.pathname.startsWith('/requests/') && location.pathname !== '/requests/new')
-    return active
-      ? 'text-sm font-bold leading-normal text-black'
-      : 'text-sm font-medium leading-normal text-[#111418] transition-all duration-200 hover:font-bold hover:text-violet-700'
+    return active ? 'nav-link-premium active' : 'nav-link-premium'
   }
 
   const navigation = user && (
     <>
+      {/* Dashboard - all roles */}
       <Link className={linkClass('/dashboard')} to="/dashboard">Dashboard</Link>
-      <Link className={linkClass('/requests')} to="/requests">Requests</Link>
-      {user.role === 'requester' && <Link className={linkClass('/requests/new')} to="/requests/new">Submit Request</Link>}
-      <Link className={linkClass('/reports')} to="/reports">Reports</Link>
+      
+      {/* Requester / HOD / Staff */}
+      {['requester', 'hod', 'staff'].includes(user.role) && (
+        <>
+          <Link className={linkClass('/requests')} to="/requests">My Requests</Link>
+          <Link className={linkClass('/requests/new')} to="/requests/new">Submit Request</Link>
+        </>
+      )}
+
+      {/* Admin - limited to approval/monitoring */}
+      {user.role === 'admin' && (
+        <>
+          <Link className={linkClass('/requests')} to="/requests">Requests</Link>
+          <Link className={linkClass('/vendors')} to="/vendors">Vendors</Link>
+          <Link className={linkClass('/purchase-orders')} to="/purchase-orders">POs</Link>
+          <Link className={linkClass('/deliveries')} to="/deliveries">Deliveries</Link>
+          <Link className={linkClass('/grn')} to="/grn">GRN</Link>
+          <Link className={linkClass('/reports')} to="/reports">Reports</Link>
+          <Link className={linkClass('/admin/users')} to="/admin/users">Users</Link>
+          <Link className={linkClass('/admin/audit')} to="/admin/audit">Audit</Link>
+        </>
+      )}
+
+      {/* Super Admin - full access */}
+      {user.role === 'super_admin' && (
+        <>
+          <Link className={linkClass('/requests')} to="/requests">Requests</Link>
+          <Link className={linkClass('/vendors')} to="/vendors">Vendors</Link>
+          <Link className={linkClass('/purchase-orders')} to="/purchase-orders">POs</Link>
+          <Link className={linkClass('/deliveries')} to="/deliveries">Deliveries</Link>
+          <Link className={linkClass('/gate')} to="/gate">Gate</Link>
+          <Link className={linkClass('/grn')} to="/grn">GRN</Link>
+          <Link className={linkClass('/reports')} to="/reports">Reports</Link>
+          <Link className={linkClass('/admin/users')} to="/admin/users">Users</Link>
+          <Link className={linkClass('/admin/audit')} to="/admin/audit">Audit</Link>
+        </>
+      )}
+
+      {/* Manager */}
+      {user.role === 'manager' && (
+        <>
+          <Link className={linkClass('/requests')} to="/requests">Requests</Link>
+          <Link className={linkClass('/vendors')} to="/vendors">Vendors</Link>
+          <Link className={linkClass('/manager/quotations')} to="/manager/quotations">Quotations</Link>
+          <Link className={linkClass('/purchase-orders')} to="/purchase-orders">POs</Link>
+          <Link className={linkClass('/deliveries')} to="/deliveries">Deliveries</Link>
+          <Link className={linkClass('/grn')} to="/grn">GRN</Link>
+          <Link className={linkClass('/reports')} to="/reports">Reports</Link>
+        </>
+      )}
+
+      {/* Gate Security */}
+      {user.role === 'gate' && (
+        <>
+          <Link className={linkClass('/gate')} to="/gate">Scan</Link>
+          <Link className={linkClass('/gate/vehicles')} to="/gate/vehicles">Vehicles</Link>
+          <Link className={linkClass('/gate/history')} to="/gate/history">History</Link>
+        </>
+      )}
+
+      {/* Receiving Officer */}
+      {user.role === 'receiving_officer' && (
+        <>
+          <Link className={linkClass('/deliveries')} to="/deliveries">Deliveries</Link>
+          <Link className={linkClass('/grn')} to="/grn">GRN</Link>
+          <Link className={linkClass('/receiving/damaged')} to="/receiving/damaged">Damaged</Link>
+        </>
+      )}
+
+      {/* Vendor */}
+      {user.role === 'vendor' && (
+        <>
+          <Link className={linkClass('/purchase-orders')} to="/purchase-orders">My POs</Link>
+          <Link className={linkClass('/deliveries')} to="/deliveries">Deliveries</Link>
+          <Link className={linkClass('/vendor/invoices')} to="/vendor/invoices">Invoices</Link>
+          <Link className={linkClass('/vendor/payments')} to="/vendor/payments">Payments</Link>
+        </>
+      )}
+
+      {/* Accounts */}
+      {user.role === 'accounts' && (
+        <>
+          <Link className={linkClass('/accounts/payments')} to="/accounts/payments">Payments</Link>
+          <Link className={linkClass('/grn')} to="/grn">GRN</Link>
+          <Link className={linkClass('/reports')} to="/reports">Reports</Link>
+        </>
+      )}
+
+      {/* Technician */}
+      {user.role === 'technician' && (
+        <Link className={linkClass('/requests')} to="/requests">My Work Orders</Link>
+      )}
     </>
   )
 
@@ -76,7 +172,7 @@ function Header() {
       <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4 md:gap-6 lg:gap-8">
           <Link to={user ? '/dashboard' : '/'} className="flex flex-shrink-0 items-center gap-2 md:gap-3">
             <span className="size-9 sm:size-10 md:size-10">
-              <img src="/images/mseclogo.png" alt="MSEC Logo" className="h-full w-full object-contain" />
+              <img src="/images/mseclogo.png" alt="CampusServe Logo" className="h-full w-full object-contain" />
             </span>
             <h2 className="whitespace-nowrap text-base font-bold leading-tight tracking-[-0.015em] sm:text-lg md:text-xl">
               <span className="text-[#111418]">MSEC</span> <span className="wave-text-violet">CampusServe</span>
@@ -88,20 +184,15 @@ function Header() {
       <div className={`${isAuthPage ? 'hidden' : 'hidden lg:flex'} flex-shrink-0 items-center gap-2 lg:gap-3 xl:gap-4`}>
           {user ? (
             <>
-              <form onSubmit={handleSearchSubmit} className="relative !h-9 w-40 lg:!h-10 lg:w-48 xl:w-64">
-                <Search size={18} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-[#60758a] lg:h-5 lg:w-5" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search requests, locations..."
-                  className="form-input relative z-0 h-full w-full rounded-lg border border-white/10 bg-white/30 pl-9 pr-3 text-xs font-normal leading-normal text-[#111418] outline-none backdrop-blur-sm placeholder:text-[#60758a] focus:outline-0 focus:ring-0 lg:rounded-xl lg:pl-10 lg:text-sm"
-                />
-              </form>
               <div className="relative flex flex-shrink-0 items-center gap-1 lg:gap-2" ref={dropdownRef}>
                 <button className="relative hidden h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-[#f0f2f5] lg:flex lg:h-10 lg:w-10" aria-label="Notifications">
                   <Bell className="h-5 w-5 text-[#60758a] transition-colors hover:text-violet-600" />
-                  <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border border-white bg-violet-600" />
+                  {notifCount > 0 && (
+                    <span className="absolute right-1.5 top-1.5 h-4 w-4 flex items-center justify-center rounded-full border border-white bg-violet-600 text-[8px] font-black text-white">
+                      {notifCount > 9 ? '9+' : notifCount}
+                    </span>
+                  )}
+                  {notifCount === 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border border-white bg-violet-600" />}
                 </button>
                 <button onClick={() => setIsSettingsOpen((value) => !value)} className="group flex h-9 items-center gap-2 rounded-lg px-2 transition-colors hover:bg-[#f0f2f5] lg:h-10 lg:px-3" title="Settings">
                   <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-700 text-xs font-bold text-white lg:h-8 lg:w-8 lg:text-sm">
@@ -113,7 +204,7 @@ function Header() {
               </div>
             </>
           ) : (
-            <Link to="/login" className="flex h-9 min-w-[60px] items-center justify-center overflow-hidden rounded-lg bg-violet-600 px-3 text-xs font-bold leading-normal tracking-[0.015em] text-white transition-all duration-200 hover:bg-violet-700 lg:h-10 lg:min-w-[70px] lg:rounded-xl lg:px-4 lg:text-sm">Login</Link>
+            <Link to="/login" className="btn-premium h-9 min-w-[60px] justify-center px-3 text-xs lg:h-10 lg:min-w-[70px] lg:px-4 lg:text-sm">Login</Link>
           )}
       </div>
 
@@ -125,11 +216,7 @@ function Header() {
       </div>
 
       {user && isMobileMenuOpen && (
-        <div className="absolute left-0 right-0 top-[calc(100%+8px)] mx-1 overflow-hidden rounded-2xl border border-violet-100 bg-white/95 p-4 shadow-2xl shadow-violet-950/10 backdrop-blur-xl lg:hidden">
-          <form onSubmit={handleSearchSubmit} className="relative mb-3 lg:hidden">
-            <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search requests" className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none focus:border-violet-300 focus:ring-4 focus:ring-violet-100" />
-          </form>
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] mx-1 overflow-hidden rounded-2xl premium-card p-4 shadow-glass-lg lg:hidden">
           <nav className="flex flex-col gap-1 [&>a]:rounded-xl [&>a]:px-3 [&>a]:py-2.5">{navigation}</nav>
           <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 sm:hidden">
             <div className="flex min-w-0 items-center gap-2.5">

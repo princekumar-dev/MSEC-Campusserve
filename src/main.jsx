@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
+import './styles/premium.css'
 import './performance.css'
 
 // SECURITY: Suppress all standard logs to hide success messages and sensitive data

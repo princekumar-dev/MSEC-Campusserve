@@ -12,20 +12,14 @@ export const NOTIFICATION_TYPES = {
   ACCOUNT_REJECTED: 'staff_account_rejected',
   ACCOUNT_STATUS: 'staff_account_status',
 
-  // Staff account approval requests (for HOD)
+  // Staff account approval requests (for admin)
   STAFF_ACCOUNT_APPROVAL: 'staff_account_approval',
 
-  // Late arrival related
-  LATE_ARRIVAL: 'late_arrival',
-  LATE_CONFIRMATION: 'late_confirmation_needed',
-  LATE_CONFIRMED: 'late_arrival_confirmed',
-  LATE_REACHED: 'student_late_reached',
-
-  // Leave requests
-  LEAVE_REQUEST: 'leave_request',
-
-  // Student notifications
-  STUDENT_MESSAGE: 'student_message',
+  // Service request notifications
+  SERVICE_REQUEST: 'service_request',
+  QUOTATION_UPDATE: 'quotation_update',
+  WORK_ORDER_UPDATE: 'work_order_update',
+  INVOICE_UPDATE: 'invoice_update',
 
   // System
   SYSTEM: 'system'
@@ -118,7 +112,7 @@ export const NOTIFICATION_CONFIG = {
     hideNewBadge: false
   },
 
-  // Staff account approval request (for HOD)
+  // Staff account approval request (for admin)
   [NOTIFICATION_TYPES.STAFF_ACCOUNT_APPROVAL]: {
     category: 'staff-request',
     autoDismiss: 0,
@@ -135,66 +129,63 @@ export const NOTIFICATION_CONFIG = {
     requiresAction: true
   },
 
-  // Late arrival related
-  [NOTIFICATION_TYPES.LATE_ARRIVAL]: {
-    category: 'late-arrival',
+  // Service request notifications
+  [NOTIFICATION_TYPES.SERVICE_REQUEST]: {
+    category: 'service',
     autoDismiss: 0,
-    icon: '⏰',
-    bgColor: 'bg-orange-50',
-    borderColor: 'border-orange-300',
-    badgeBg: 'bg-orange-100',
-    badgeText: 'text-orange-700',
-    badgeLabel: 'Late Arrival',
-    titleClass: 'text-orange-900',
-    bodyClass: 'text-orange-800',
-    dismissable: false,
-    hideNewBadge: true,
-    requiresAction: true
-  },
-  [NOTIFICATION_TYPES.LATE_REACHED]: {
-    category: 'late-arrival',
-    autoDismiss: 6000,
-    icon: '✅',
-    bgColor: 'bg-teal-50',
-    borderColor: 'border-teal-200',
-    badgeBg: 'bg-teal-100',
-    badgeText: 'text-teal-700',
-    badgeLabel: 'Arrived',
-    titleClass: 'text-teal-900',
-    bodyClass: 'text-teal-800',
+    icon: '🔧',
+    bgColor: 'bg-violet-50',
+    borderColor: 'border-violet-300',
+    badgeBg: 'bg-violet-100',
+    badgeText: 'text-violet-700',
+    badgeLabel: 'Service Request',
+    titleClass: 'text-violet-900',
+    bodyClass: 'text-violet-800',
     dismissable: true,
     hideNewBadge: false
   },
 
-  // Leave requests
-  [NOTIFICATION_TYPES.LEAVE_REQUEST]: {
-    category: 'leave',
+  [NOTIFICATION_TYPES.QUOTATION_UPDATE]: {
+    category: 'service',
     autoDismiss: 0,
-    icon: '📅',
-    bgColor: 'bg-cyan-50',
-    borderColor: 'border-cyan-300',
-    badgeBg: 'bg-cyan-100',
-    badgeText: 'text-cyan-700',
-    badgeLabel: 'Leave Request',
-    titleClass: 'text-cyan-900',
-    bodyClass: 'text-cyan-800',
-    dismissable: false,
-    hideNewBadge: true,
-    requiresAction: true
+    icon: '📋',
+    bgColor: 'bg-blue-50',
+    borderColor: 'border-blue-300',
+    badgeBg: 'bg-blue-100',
+    badgeText: 'text-blue-700',
+    badgeLabel: 'Quotation Update',
+    titleClass: 'text-blue-900',
+    bodyClass: 'text-blue-800',
+    dismissable: true,
+    hideNewBadge: false
   },
 
-  // Student messages
-  [NOTIFICATION_TYPES.STUDENT_MESSAGE]: {
-    category: 'student',
+  [NOTIFICATION_TYPES.WORK_ORDER_UPDATE]: {
+    category: 'service',
     autoDismiss: 0,
-    icon: '👨‍🎓',
-    bgColor: 'bg-sky-50',
-    borderColor: 'border-sky-200',
-    badgeBg: 'bg-sky-100',
-    badgeText: 'text-sky-700',
-    badgeLabel: 'Student Update',
-    titleClass: 'text-sky-900',
-    bodyClass: 'text-sky-800',
+    icon: '🔨',
+    bgColor: 'bg-amber-50',
+    borderColor: 'border-amber-300',
+    badgeBg: 'bg-amber-100',
+    badgeText: 'text-amber-700',
+    badgeLabel: 'Work Order Update',
+    titleClass: 'text-amber-900',
+    bodyClass: 'text-amber-800',
+    dismissable: true,
+    hideNewBadge: false
+  },
+
+  [NOTIFICATION_TYPES.INVOICE_UPDATE]: {
+    category: 'service',
+    autoDismiss: 0,
+    icon: '💰',
+    bgColor: 'bg-emerald-50',
+    borderColor: 'border-emerald-300',
+    badgeBg: 'bg-emerald-100',
+    badgeText: 'text-emerald-700',
+    badgeLabel: 'Invoice Update',
+    titleClass: 'text-emerald-900',
+    bodyClass: 'text-emerald-800',
     dismissable: true,
     hideNewBadge: false
   },
@@ -222,12 +213,10 @@ export const getNotificationConfig = (type) => {
 
 export const getCategoryLabel = (category) => {
   const labels = {
-    'account': '⚙️ Account Settings',
-    'staff-request': '👤 Staff Requests',
-    'late-arrival': '⏰ Late Arrivals',
-    'leave': '📅 Leave Requests',
-    'student': '👨‍🎓 Student Updates',
-    'system': '📢 System'
+    'account': 'Account Settings',
+    'staff-request': 'Staff Requests',
+    'service': 'Service Updates',
+    'system': 'System'
   }
   return labels[category] || 'Notifications'
 }
