@@ -3036,17 +3036,17 @@ a[class*="bg-"]:not([class*="hover"]) {
 
 /* Settings Modal Glass Card - Independent from Header */
 .settings-glass-card {
-  background: rgba(255, 255, 255, 0.75);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(248, 245, 255, 0.9) 50%, rgba(255, 255, 255, 0.92) 100%);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   backdrop-filter: saturate(180%) blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(196, 181, 253, 0.25);
   box-shadow: 0 20px 40px rgba(17, 17, 23, 0.1), 0 8px 16px rgba(17, 17, 23, 0.06);
   border-radius: 20px;
   transition: all 0.3s ease;
 }
 
 .settings-glass-card:hover {
-  background: rgba(255, 255, 255, 0.85);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 245, 255, 0.95) 50%, rgba(255, 255, 255, 0.96) 100%);
   box-shadow: 0 25px 50px rgba(17, 17, 23, 0.15), 0 12px 24px rgba(17, 17, 23, 0.1);
   transform: translateY(-2px);
 }
