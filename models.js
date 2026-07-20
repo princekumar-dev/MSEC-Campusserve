@@ -406,6 +406,25 @@ AuditLogSchema.index({ entityType: 1, entityId: 1 })
 AuditLogSchema.index({ actorId: 1 })
 AuditLogSchema.index({ createdAt: -1 })
 
+// ─── Email Verification Schema ───────────────────────────────────────────────
+const EmailVerificationSchema = new mongoose.Schema({
+  email: { type: String, required: true, index: true },
+  purpose: { type: String, required: true },
+  codeHash: { type: String, required: true },
+  expiresAt: { type: Date, required: true },
+  attempts: { type: Number, default: 0 },
+  lastAttemptAt: { type: Date },
+  verifiedAt: { type: Date },
+  sessionTokenHash: { type: String },
+  sessionExpiresAt: { type: Date },
+  tokenUsedAt: { type: Date },
+  requestIp: { type: String },
+  userAgent: { type: String },
+  createdAt: { type: Date, default: Date.now }
+})
+EmailVerificationSchema.index({ email: 1, purpose: 1 })
+EmailVerificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 })
+
 // Export all models
 export const User = mongoose.models.User || mongoose.model('User', UserSchema)
 export const ServiceRequest = mongoose.models.ServiceRequest || mongoose.model('ServiceRequest', ServiceRequestSchema)
@@ -418,3 +437,4 @@ export const DeliverySchedule = mongoose.models.DeliverySchedule || mongoose.mod
 export const GateEntry = mongoose.models.GateEntry || mongoose.model('GateEntry', GateEntrySchema)
 export const GoodsReceipt = mongoose.models.GoodsReceipt || mongoose.model('GoodsReceipt', GoodsReceiptSchema)
 export const AuditLog = mongoose.models.AuditLog || mongoose.model('AuditLog', AuditLogSchema)
+export const EmailVerification = mongoose.models.EmailVerification || mongoose.model('EmailVerification', EmailVerificationSchema)

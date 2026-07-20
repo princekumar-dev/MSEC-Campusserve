@@ -5,7 +5,8 @@ node_modules/
 dist/
 build/
 
-# Local env files (excluding main tracked envs)
+# Environment files with secrets
+.env
 .env.local
 .env.development.local
 .env.test.local

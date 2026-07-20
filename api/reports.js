@@ -13,8 +13,8 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const userId = req.headers['x-user-id']
-      const userRole = req.headers['x-user-role']
+      const userId = req.user ? req.user.id : (req.headers['x-user-id'] || '')
+      const userRole = req.user ? req.user.role : (req.headers['x-user-role'] || '')
 
       // Build role-scoped filter
       const filter = {}
@@ -50,7 +50,7 @@ export default async function handler(req, res) {
       let totalExpenses = 0
       let totalQuotations = 0
 
-      requests.forEach(r => {
+      for (const r of requests) {
         // Category count
         categories[r.category] = (categories[r.category] || 0) + 1
 
@@ -62,9 +62,15 @@ export default async function handler(req, res) {
         const totalPaid = r.payments ? r.payments.reduce((sum, p) => sum + p.amount, 0) : 0
         totalExpenses += totalPaid
 
-        // Department cost
+        // Department cost — look up requester's department
         if (totalPaid > 0) {
-          const dept = r.department || 'General'
+          let dept = 'General'
+          if (r.requesterId) {
+            try {
+              const requester = await User.findById(r.requesterId).select('department').lean()
+              if (requester && requester.department) dept = requester.department
+            } catch (e) { /* ignore */ }
+          }
           departmentCosts[dept] = (departmentCosts[dept] || 0) + totalPaid
         }
 
@@ -79,7 +85,7 @@ export default async function handler(req, res) {
             techStats[tech].completed += 1
           }
         }
-      })
+      }
 
       // Turn categories object into array for charting
       const categoryData = Object.keys(categories).map(name => ({

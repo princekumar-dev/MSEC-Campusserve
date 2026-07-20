@@ -8,9 +8,9 @@ export default async function handler(req, res) {
     return res.status(503).json({ success: false, error: 'Database connection failed' })
   }
 
-  const actorId = req.headers['x-user-id'] || 'system'
-  const userRole = req.headers['x-user-role']
-  const actor = await User.findById(actorId).lean()
+  const actorId = req.user ? req.user.id : (req.headers['x-user-id'] || 'system')
+  const userRole = req.user ? req.user.role : (req.headers['x-user-role'] || '')
+  const actor = req.user || await User.findById(actorId).lean()
   const actorName = actor ? actor.name : 'Unknown'
 
   try {
@@ -50,6 +50,9 @@ export default async function handler(req, res) {
 
     // ── POST /api/vendors?id=&action=activate|deactivate|blacklist ────────────
     if (req.method === 'POST' && id && action) {
+      if (!['admin', 'super_admin', 'manager'].includes(userRole)) {
+        return res.status(403).json({ success: false, error: 'Only admin or manager can change vendor status' })
+      }
       const vendor = await Vendor.findById(id)
       if (!vendor) return res.status(404).json({ success: false, error: 'Vendor not found' })
       if (action === 'activate') vendor.status = 'ACTIVE'

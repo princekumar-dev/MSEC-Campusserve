@@ -163,6 +163,12 @@ router.post('/send', async (req, res) => {
 // Broadcast notification to all users (only active status)
 router.post('/broadcast', async (req, res) => {
   try {
+    // Only admin can broadcast
+    const userRole = req.user ? req.user.role : ''
+    if (!['admin', 'super_admin'].includes(userRole)) {
+      return res.status(403).json({ success: false, message: 'Only admin can broadcast notifications' })
+    }
+
     const { title, body, url, icon, badge } = req.body
 
     if (!title || !body) {

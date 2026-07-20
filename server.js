@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import { connectToDatabase } from './lib/mongo.js';
 import mongoose from 'mongoose';
+import { authenticate } from './lib/auth.js';
 
 // Load environment variables
 dotenv.config();
@@ -63,10 +64,19 @@ app.use(cors({
       return callback(null, true);
     }
     
-    // Check if origin is localhost (any port) for development
-    if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
-      return callback(null, true)
-    }
+    // Check if origin is localhost or LAN IP (any port) for development
+    try {
+      const url = new URL(origin);
+      if (
+        url.hostname === 'localhost' ||
+        url.hostname === '127.0.0.1' ||
+        url.hostname.startsWith('192.168.') ||
+        url.hostname.startsWith('10.') ||
+        url.hostname.startsWith('172.')
+      ) {
+        return callback(null, true);
+      }
+    } catch (e) { /* invalid URL, fall through */ }
     
     const msg = `CORS not allowed for origin: ${origin}`;
     return callback(new Error(msg), false);
@@ -123,6 +133,16 @@ app.use((req, res, next) => {
     res.setHeader('Cache-Control', 'public, max-age=86400');
   }
   next();
+});
+
+// JWT authentication middleware — applied to all /api routes except login
+app.use('/api', (req, res, next) => {
+  // Skip auth for OPTIONS preflight, login endpoint, and health/debug
+  if (req.method === 'OPTIONS') return next();
+  if (req.path === '/auth' && req.method === 'POST') return next();
+  if (req.path === '/health') return next();
+  if (req.path === '/debug') return next();
+  authenticate(req, res, next);
 });
 
 // Security headers
