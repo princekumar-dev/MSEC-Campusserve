@@ -141,7 +141,7 @@ function Requests() {
       />
 
       {/* Quick Filter Chips */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+      <div className="mobile-edge-scroll flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
         {QUICK_FILTERS.map(f => (
           <button
             key={f.value}
@@ -162,7 +162,7 @@ function Requests() {
 
       {/* Search & Advanced Filters */}
       <div className="premium-card">
-        <div className="flex items-center gap-3 p-4">
+        <div className="flex min-w-0 items-center gap-2 p-3 sm:gap-3 sm:p-4">
           <div className="relative flex-1">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -249,8 +249,8 @@ function Requests() {
             ))}
           </div>
         ) : filteredRequests.length === 0 ? (
-          <div className="text-center py-16 px-6">
-            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="px-4 py-10 text-center sm:px-6 sm:py-16">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 sm:h-16 sm:w-16">
               <ClipboardList size={28} className="text-slate-300" />
             </div>
             <h3 className="text-sm font-bold text-slate-600 mb-1">
@@ -270,7 +270,39 @@ function Requests() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            <div className="space-y-3 p-3 sm:hidden">
+              {paginatedRequests.map((req) => (
+                <Link
+                  key={req._id}
+                  to={`/requests/${req._id}`}
+                  className={`block min-w-0 rounded-xl border border-slate-100 border-l-4 bg-white p-4 shadow-sm ${getPriorityBorder(req.priority)}`}
+                >
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-mono text-xs font-bold text-violet-600">{req.requestNumber}</p>
+                      <h3 className="mt-1 break-words text-sm font-bold leading-snug text-slate-800">{req.title}</h3>
+                    </div>
+                    <ChevronRight size={18} className="mt-1 flex-shrink-0 text-slate-400" />
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${
+                      req.priority === 'EMERGENCY' ? 'bg-rose-100 text-rose-700' :
+                      req.priority === 'HIGH' ? 'bg-amber-100 text-amber-700' :
+                      req.priority === 'MEDIUM' ? 'bg-blue-100 text-blue-700' :
+                      'bg-slate-100 text-slate-600'
+                    }`}>{req.priority}</span>
+                    <span className={`status-badge status-${req.status.toLowerCase()}`}>
+                      {req.status.replace(/_/g, ' ')}
+                    </span>
+                    <span className="ml-auto text-[10px] text-slate-400">
+                      {req.updatedAt ? formatDistanceToNow(new Date(req.updatedAt), { addSuffix: true }) : ''}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            <div className="requests-table-scroll hidden overflow-x-auto sm:block">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50">
@@ -332,7 +364,7 @@ function Requests() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100">
+              <div className="flex flex-col gap-3 border-t border-slate-100 px-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                 <span className="text-xs text-slate-400 font-semibold">
                   Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredRequests.length)} of {filteredRequests.length}
                 </span>

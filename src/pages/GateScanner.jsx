@@ -26,7 +26,7 @@ function ScannerPanel({ onResult }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 space-y-6">
+    <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:space-y-6 sm:p-8">
       <div className="flex items-center space-x-3">
         <div className="p-3 bg-violet-50 rounded-xl text-violet-600"><QrCode size={24} /></div>
         <div>
@@ -35,7 +35,7 @@ function ScannerPanel({ onResult }) {
         </div>
       </div>
       <form onSubmit={handleScan} className="space-y-4">
-        <div className="border-2 border-dashed border-violet-200 rounded-2xl p-8 text-center bg-violet-50/40 space-y-3">
+        <div className="space-y-3 rounded-2xl border-2 border-dashed border-violet-200 bg-violet-50/40 p-4 text-center sm:p-8">
           <QrCode size={48} className="mx-auto text-violet-300" />
           <p className="text-xs text-slate-400 font-medium">Scan QR code or paste token below</p>
           <input
@@ -71,7 +71,7 @@ function ManualCodePanel({ onResult }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 space-y-6">
+    <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:space-y-6 sm:p-8">
       <div className="flex items-center space-x-3">
         <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600"><Keyboard size={24} /></div>
         <div>
@@ -126,7 +126,7 @@ function ResultCard({ result, onClear, onReject }) {
       {isApproved && delivery && (
         <div className="bg-white rounded-xl border border-emerald-200 p-5 space-y-3">
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Delivery Information</h3>
-          <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
             {[
               { label: 'PO Number', value: delivery.poNumber },
               { label: 'Vendor', value: delivery.vendorName },

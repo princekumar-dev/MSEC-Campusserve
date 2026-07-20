@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAlert } from '../components/AlertContext'
 import apiClient from '../utils/apiClient'
@@ -7,7 +8,7 @@ import { formatDistanceToNow } from 'date-fns'
 import {
   ArrowLeft, CheckCircle2, AlertCircle, Wrench, Download, Clock,
   Plus, Trash2, IndianRupee, FileCheck, ChevronRight, Loader2,
-  AlertTriangle, CheckCircle, Circle, User, Calendar, MapPin, Tag
+  AlertTriangle, Check, CheckCircle, Circle, User, Calendar, MapPin, Tag
 } from 'lucide-react'
 
 const WORKFLOW_STEPS = [
@@ -33,10 +34,29 @@ const STATUS_ORDER = WORKFLOW_STEPS.map(s => s.key)
 const TABS = ['Overview', 'Diagnosis', 'Quotation', 'Work Order', 'Invoice', 'Payments', 'History']
 
 function ConfirmModal({ open, title, message, onConfirm, onCancel, loading }) {
+  useEffect(() => {
+    if (!open) return undefined
+
+    const previousBodyOverflow = document.body.style.overflow
+    const previousHtmlOverflow = document.documentElement.style.overflow
+    const scrollContainers = document.querySelectorAll('.layout-container')
+    const previousContainerOverflow = Array.from(scrollContainers, node => node.style.overflow)
+
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+    scrollContainers.forEach(node => { node.style.overflow = 'hidden' })
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow
+      document.documentElement.style.overflow = previousHtmlOverflow
+      scrollContainers.forEach((node, index) => { node.style.overflow = previousContainerOverflow[index] })
+    }
+  }, [open])
+
   if (!open) return null
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onCancel}>
-      <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl border border-slate-200" onClick={e => e.stopPropagation()}>
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 backdrop-blur-sm sm:p-6" onClick={onCancel}>
+      <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:p-6" onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-3 mb-3">
           <div className="p-2 bg-amber-50 rounded-full">
             <AlertTriangle size={18} className="text-amber-600" />
@@ -58,7 +78,8 @@ function ConfirmModal({ open, title, message, onConfirm, onCancel, loading }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -70,35 +91,58 @@ function StatusTimeline({ currentStatus }) {
   )
   const isRejected = ['REJECTED', 'CANCELLED'].includes(currentStatus)
   const isOpen = ['CLARIFICATION_REQUIRED', 'REOPENED'].includes(currentStatus)
+  const displayIdx = Math.max(0, effectiveIdx)
+  const currentStep = WORKFLOW_STEPS[displayIdx]
+  const nextStep = WORKFLOW_STEPS[Math.min(displayIdx + 1, WORKFLOW_STEPS.length - 1)]
+  const progress = Math.round((displayIdx / (WORKFLOW_STEPS.length - 1)) * 100)
 
   return (
-    <div className="premium-card p-4 overflow-x-auto scrollbar-none">
-      <div className="step-indicator min-w-max">
+    <div className="premium-card overflow-hidden p-4 sm:p-5">
+      <div className="sm:hidden">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-violet-500">Workflow progress</p>
+            <h2 className="mt-1 truncate text-base font-extrabold text-slate-900">
+              {isRejected ? currentStatus.replace(/_/g, ' ') : currentStep?.label}
+            </h2>
+            {!isRejected && displayIdx < WORKFLOW_STEPS.length - 1 && (
+              <p className="mt-0.5 text-xs text-slate-500">Next: {nextStep?.label}</p>
+            )}
+          </div>
+          <span className="flex-shrink-0 rounded-full bg-violet-50 px-3 py-1 text-xs font-extrabold text-violet-700">
+            {isRejected ? 'Stopped' : `${displayIdx + 1}/${WORKFLOW_STEPS.length}`}
+          </span>
+        </div>
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
+          <div
+            className={`h-full rounded-full transition-all ${isRejected ? 'bg-rose-500' : 'bg-gradient-to-r from-violet-600 to-fuchsia-500'}`}
+            style={{ width: isRejected ? '100%' : `${Math.max(5, progress)}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="hidden overflow-x-auto scrollbar-none sm:block">
+      <div className="grid min-w-[920px] grid-cols-[repeat(15,minmax(56px,1fr))] px-1 pt-1">
         {WORKFLOW_STEPS.map((step, idx) => {
           const isCompleted = effectiveIdx > idx && !isRejected
           const isCurrent = step.key === currentStatus || (
             currentStatus === 'SUBMITTED' && step.key === 'UNDER_ADMIN_REVIEW'
           )
           return (
-            <div key={step.key} className="flex items-center">
-              <div className={`step-dot ${isCompleted ? 'completed' : ''} ${isCurrent ? 'active' : ''}`} title={step.label}>
+            <div key={step.key} className="relative flex min-w-0 flex-col items-center">
+              {idx < WORKFLOW_STEPS.length - 1 && (
+                <div className={`absolute left-1/2 top-[15px] h-0.5 w-full ${isCompleted ? 'bg-emerald-500' : 'bg-slate-200'}`} />
+              )}
+              <div className={`step-dot relative z-10 ${isCompleted ? 'completed' : ''} ${isCurrent ? 'active' : ''}`} title={step.label}>
                 {isCompleted ? <Check size={10} /> : <span className="text-xs">{idx + 1}</span>}
               </div>
-              {idx < WORKFLOW_STEPS.length - 1 && (
-                <div className={`step-line ${isCompleted ? 'completed' : ''}`} />
-              )}
+              <span className={`mt-2 w-full truncate px-1 text-center text-[7px] font-bold uppercase tracking-wide ${
+                idx === effectiveIdx ? 'text-violet-600' : 'text-slate-300'
+              }`} title={step.label}>{step.short}</span>
             </div>
           )
         })}
       </div>
-      <div className="flex justify-between mt-2 min-w-max px-1">
-        {WORKFLOW_STEPS.map((step, idx) => (
-          <span key={step.key} className={`text-[7px] font-bold uppercase tracking-wider w-14 text-center ${
-            idx === effectiveIdx ? 'text-violet-600' : 'text-slate-300'
-          }`}>
-            {step.short}
-          </span>
-        ))}
       </div>
       {(isRejected || isOpen) && (
         <div className={`mt-3 px-3 py-2 rounded-lg text-xs font-bold ${
@@ -306,7 +350,7 @@ function RequestDetails() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <ConfirmModal {...confirmModal} loading={actionLoading} />
 
       {/* Back + Status */}
@@ -323,11 +367,11 @@ function RequestDetails() {
       <StatusTimeline currentStatus={request.status} />
 
       {/* Hero Header */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <div className="flex flex-col md:flex-row justify-between items-start gap-4">
           <div>
             <span className="text-xs font-mono text-violet-600 font-bold tracking-wider">{request.requestNumber}</span>
-            <h1 className="text-2xl font-black text-slate-800 mt-1">{request.title}</h1>
+            <h1 className="mt-1 break-words text-xl font-black text-slate-800 sm:text-2xl">{request.title}</h1>
             <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-slate-500">
               <span className="flex items-center gap-1"><MapPin size={12} /> {request.location}</span>
               <span className="flex items-center gap-1"><User size={12} /> {request.requesterName}</span>
@@ -347,10 +391,10 @@ function RequestDetails() {
       </div>
 
       {/* Tabs */}
-      <div className="flex overflow-x-auto space-x-1 border-b border-slate-200 pb-px scrollbar-none">
+      <div className="request-detail-tabs mobile-edge-scroll flex snap-x snap-mandatory gap-2 overflow-x-auto border-b border-slate-200 pb-1 scrollbar-none sm:gap-1">
         {TABS.map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`relative px-5 py-3 text-sm font-semibold whitespace-nowrap transition-all border-b-2 -mb-px ${
+            className={`request-detail-tab relative flex-shrink-0 snap-start whitespace-nowrap border-b-2 px-4 py-3 text-sm font-semibold transition-all sm:-mb-px sm:px-5 ${
               activeTab === tab ? 'border-violet-600 text-violet-600 bg-violet-50/50' : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}>
             {tab}
@@ -491,7 +535,7 @@ function RequestDetails() {
 
         {/* DIAGNOSIS */}
         {activeTab === 'Diagnosis' && (
-          <div className="max-w-xl mx-auto bg-white p-8 rounded-xl border border-slate-200 shadow-sm space-y-6 text-left">
+          <div className="mx-auto w-full max-w-xl space-y-5 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm sm:space-y-6 sm:p-8">
             <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
               <div className="p-2 bg-violet-50 rounded-lg text-violet-600"><Wrench size={18} /></div>
               <h3 className="text-base font-bold text-slate-800">Diagnostic Assessment</h3>
@@ -506,7 +550,7 @@ function RequestDetails() {
                   <strong className="text-slate-400 font-bold block mb-1">Recommendation:</strong>
                   <p className="bg-slate-50 p-3 rounded border border-slate-100 leading-relaxed text-xs">{request.inspection.recommendation}</p>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div><strong className="text-slate-400 font-bold block mb-0.5">Duration:</strong><span className="text-slate-800 font-semibold">{request.inspection.estimatedDurationHours}h</span></div>
                   <div><strong className="text-slate-400 font-bold block mb-0.5">Mode:</strong><span className="text-slate-800 font-semibold capitalize">{request.inspection.serviceMode.replace(/_/g, ' ')}</span></div>
                 </div>
@@ -521,7 +565,7 @@ function RequestDetails() {
                   <label className="block text-xs font-bold text-slate-600 mb-2">Recommendation *</label>
                   <textarea rows={3} placeholder="Recommendation..." value={recommendation} onChange={e => setRecommendation(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none resize-none" />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-2">Est. Hours</label>
                     <input type="number" value={estDuration} onChange={e => setEstDuration(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none" />

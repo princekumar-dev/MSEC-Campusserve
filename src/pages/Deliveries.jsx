@@ -60,7 +60,7 @@ function ScheduleDeliveryModal({ onClose, onSaved }) {
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">Scheduled Date *</label>
               <input type="date" value={form.scheduledDate} onChange={e => setForm(p => ({ ...p, scheduledDate: e.target.value }))} min={new Date().toISOString().split('T')[0]} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-violet-500 transition-all" />
@@ -71,7 +71,7 @@ function ScheduleDeliveryModal({ onClose, onSaved }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">Slot Start</label>
               <input type="time" value={form.slotStart} onChange={e => setForm(p => ({ ...p, slotStart: e.target.value }))} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-violet-500 transition-all" />
@@ -82,7 +82,7 @@ function ScheduleDeliveryModal({ onClose, onSaved }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">Delivery Person</label>
               <select value={form.deliveryPersonId} onChange={e => setForm(p => ({ ...p, deliveryPersonId: e.target.value }))} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-violet-500 transition-all">

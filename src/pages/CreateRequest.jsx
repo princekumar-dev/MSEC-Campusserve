@@ -102,7 +102,7 @@ function CreateRequest() {
         <span className="text-xs text-slate-400 font-mono uppercase tracking-wider">New Request</span>
       </div>
 
-      <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+      <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:space-y-6 sm:p-8">
         {/* Header */}
         <div className="flex items-center gap-3 mb-2">
           <div className="p-2.5 bg-violet-50 rounded-xl text-violet-600">

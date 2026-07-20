@@ -15,13 +15,15 @@ export default async function handler(req, res) {
   const actorId = req.user ? req.user.id : (req.headers['x-user-id'] || 'system')
   const actor = req.user || await User.findById(actorId).lean()
   const actorName = actor ? actor.name : 'Unknown User'
-  const actorRole = req.user ? req.user.role : ''
+  const actorRole = req.user ? req.user.role : (req.headers['x-user-role'] || '')
 
   try {
     // 1. Create or Revise Invoice
     if (req.method === 'POST' && !action && requestId) {
       const request = await ServiceRequest.findById(requestId)
       if (!request) return res.status(404).json({ success: false, error: 'Request not found' })
+      if (!['manager', 'admin', 'super_admin'].includes(actorRole)) return res.status(403).json({ success: false, error: 'Only a manager or administrator can draft an invoice' })
+      if (!['SERVICE_VERIFIED', 'INVOICE_REVISION_REQUIRED'].includes(request.status)) return res.status(409).json({ success: false, error: 'An invoice can only be drafted after service verification or a revision request' })
 
       const { items, discountTotal } = req.body
       if (!items || !Array.isArray(items) || items.length === 0) {
@@ -108,6 +110,15 @@ export default async function handler(req, res) {
       }
 
       const oldStatus = request.status
+      const allowedStatuses = {
+        submit: ['INVOICE_IN_PROGRESS'],
+        approve: ['INVOICE_SUBMITTED'],
+        reject: ['INVOICE_SUBMITTED'],
+        revise: ['INVOICE_SUBMITTED']
+      }
+      if (allowedStatuses[action] && !allowedStatuses[action].includes(request.status)) {
+        return res.status(409).json({ success: false, error: `Action '${action}' is not available while the invoice is ${request.status.replace(/_/g, ' ').toLowerCase()}` })
+      }
 
       if (action === 'submit') {
         request.invoice.status = 'SUBMITTED'

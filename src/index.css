@@ -748,6 +748,67 @@ body {
   max-width: 100vw;
 }
 
+#root {
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  overflow-x: clip;
+}
+
+/* Shared mobile containment. Flex/grid children default to min-width:auto,
+   which lets long tables, labels and controls widen the entire application. */
+@media (max-width: 640px) {
+  .layout-container,
+  .layout-content-container,
+  .layout-content-container main,
+  .layout-content-container section,
+  .layout-content-container form,
+  .layout-content-container > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .layout-content-container input,
+  .layout-content-container select,
+  .layout-content-container textarea {
+    min-width: 0;
+    max-width: 100%;
+    font-size: 16px;
+  }
+
+  .layout-content-container .grid > *,
+  .layout-content-container .flex > * {
+    min-width: 0;
+  }
+
+  .mobile-edge-scroll {
+    width: calc(100% + 1.5rem);
+    max-width: none;
+    margin-inline: -0.75rem;
+    padding-inline: 0.75rem;
+    scroll-padding-inline: 0.75rem;
+    overscroll-behavior-inline: contain;
+  }
+
+  .premium-table,
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    font-size: 0.75rem;
+  }
+
+  th,
+  td {
+    white-space: nowrap;
+  }
+
+  .fixed.inset-0 {
+    max-width: 100vw;
+  }
+}
+
 /* Ensure images are responsive */
 img {
   max-width: 100%;
@@ -928,6 +989,19 @@ img {
 /* Global custom scrollbar */
 ::-webkit-scrollbar {
   width: 4px;
+}
+
+/* Keep the requests table horizontally scrollable without showing a colored
+   scrollbar along the card's bottom edge. */
+.requests-table-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.requests-table-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 ::-webkit-scrollbar-track {
@@ -3540,4 +3614,143 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, span, p, div, a {
 }
 .step-line.completed {
   background: #10b981;
+}
+
+/* Application-wide responsive polish ------------------------------------- */
+body:not(.auth-page) .layout-content-container {
+  container-type: inline-size;
+}
+
+body:not(.auth-page) .layout-content-container > * {
+  min-width: 0;
+}
+
+body:not(.auth-page) .layout-content-container .overflow-x-auto {
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+body:not(.auth-page) .layout-content-container table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+body:not(.auth-page) .layout-content-container th {
+  white-space: nowrap;
+}
+
+body:not(.auth-page) .layout-content-container td {
+  overflow-wrap: anywhere;
+}
+
+body:not(.auth-page) .layout-content-container input,
+body:not(.auth-page) .layout-content-container select,
+body:not(.auth-page) .layout-content-container textarea {
+  max-width: 100%;
+}
+
+@media (min-width: 1280px) {
+  body:not(.auth-page) .layout-content-container {
+    padding-top: 2rem;
+  }
+
+  body:not(.auth-page) .layout-content-container .premium-card {
+    border-radius: 1.25rem;
+  }
+}
+
+@media (max-width: 767px) {
+  body:not(.auth-page) .page-header {
+    align-items: stretch;
+    gap: 0.875rem;
+  }
+
+  body:not(.auth-page) .page-header-action,
+  body:not(.auth-page) .page-header-action > a,
+  body:not(.auth-page) .page-header-action > button {
+    width: 100%;
+  }
+
+  body:not(.auth-page) .page-header-action > a,
+  body:not(.auth-page) .page-header-action > button {
+    justify-content: center;
+  }
+
+  body:not(.auth-page) .page-title {
+    font-size: clamp(1.45rem, 7vw, 1.875rem);
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+
+  body:not(.auth-page) .page-subtitle {
+    margin-top: 0.35rem;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+  }
+
+  body:not(.auth-page) .layout-content-container .premium-card {
+    max-width: 100%;
+    border-radius: 1rem;
+  }
+
+  body:not(.auth-page) .layout-content-container .overflow-x-auto {
+    margin-inline: -0.25rem;
+    padding-inline: 0.25rem;
+    scroll-padding-inline: 0.75rem;
+  }
+
+  body:not(.auth-page) .layout-content-container table {
+    min-width: 42rem;
+    font-size: 0.75rem;
+  }
+
+  body:not(.auth-page) .layout-content-container th,
+  body:not(.auth-page) .layout-content-container td {
+    padding-block: 0.75rem;
+  }
+
+  body:not(.auth-page) .layout-content-container input:not([type='checkbox']):not([type='radio']),
+  body:not(.auth-page) .layout-content-container select,
+  body:not(.auth-page) .layout-content-container textarea {
+    min-height: 2.75rem;
+    font-size: 1rem;
+  }
+
+  body:not(.auth-page) .layout-content-container button,
+  body:not(.auth-page) .layout-content-container a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body:not(.auth-page) .kpi-card:hover,
+  body:not(.auth-page) .table-row-hover:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 420px) {
+  body:not(.auth-page) .layout-content-container {
+    padding-inline: 0.75rem;
+  }
+
+  body:not(.auth-page) .status-badge {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  .animate-fadeIn,
+  .animate-slideUp,
+  .animate-scaleIn {
+    animation: none !important;
+  }
+
+  .kpi-card,
+  .table-row-hover,
+  .step-dot {
+    transition: none !important;
+  }
 }

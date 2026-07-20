@@ -15,13 +15,16 @@ export default async function handler(req, res) {
   const actorId = req.user ? req.user.id : (req.headers['x-user-id'] || 'system')
   const actor = req.user || await User.findById(actorId).lean()
   const actorName = actor ? actor.name : 'Unknown User'
-  const actorRole = req.user ? req.user.role : ''
+  const actorRole = req.user ? req.user.role : (req.headers['x-user-role'] || '')
 
   try {
     // 1. Create Work Order (based on approved quotation)
     if (req.method === 'POST' && !action && requestId) {
       const request = await ServiceRequest.findById(requestId)
       if (!request) return res.status(404).json({ success: false, error: 'Request not found' })
+      if (!['manager', 'admin', 'super_admin'].includes(actorRole)) return res.status(403).json({ success: false, error: 'Only a manager or administrator can create a work order' })
+      if (request.status !== 'QUOTATION_APPROVED') return res.status(409).json({ success: false, error: 'A work order can only be created after quotation approval' })
+      if (request.workOrder?.workOrderNumber) return res.status(409).json({ success: false, error: 'A work order already exists for this request' })
 
       const { technicianId, vendorName, scope, startDate, dueDate } = req.body
 
@@ -34,7 +37,8 @@ export default async function handler(req, res) {
 
       if (technicianId) {
         techUser = await User.findById(technicianId).lean()
-        if (techUser) techName = techUser.name
+        if (!techUser || techUser.role !== 'technician') return res.status(400).json({ success: false, error: 'A valid technician is required' })
+        techName = techUser.name
       }
 
       const budget = request.quotation ? request.quotation.grandTotal : 0
@@ -87,6 +91,21 @@ export default async function handler(req, res) {
       }
 
       const oldStatus = request.status
+      const assignedTechnician = String(request.workOrder.technicianId || '') === String(actorId)
+      const technicianActions = ['accept', 'decline', 'start', 'pause', 'resume', 'update', 'material', 'additional-cost', 'complete']
+      if (technicianActions.includes(action) && !['admin', 'super_admin'].includes(actorRole) && !(actorRole === 'technician' && assignedTechnician)) {
+        return res.status(403).json({ success: false, error: 'Only the assigned technician can perform this action' })
+      }
+
+      const allowedStatuses = {
+        accept: ['TECHNICIAN_ASSIGNED'], decline: ['TECHNICIAN_ASSIGNED'], start: ['WORK_ACCEPTED'],
+        pause: ['IN_PROGRESS'], resume: ['PAUSED'], update: ['IN_PROGRESS'], material: ['IN_PROGRESS'],
+        'additional-cost': ['IN_PROGRESS'], 'approve-cost': ['ADDITIONAL_COST_PENDING'],
+        'reject-cost': ['ADDITIONAL_COST_PENDING'], complete: ['IN_PROGRESS']
+      }
+      if (allowedStatuses[action] && !allowedStatuses[action].includes(request.status)) {
+        return res.status(409).json({ success: false, error: `Action '${action}' is not available while the work order is ${request.status.replace(/_/g, ' ').toLowerCase()}` })
+      }
 
       if (action === 'accept') {
         request.workOrder.status = 'ACCEPTED'
@@ -150,12 +169,13 @@ export default async function handler(req, res) {
       }
       else if (action === 'update') {
         const { progressPercent, note } = req.body
-        if (progressPercent === undefined || !note) {
+        const numericProgress = Number(progressPercent)
+        if (!Number.isFinite(numericProgress) || numericProgress < 0 || numericProgress > 100 || !note) {
           return res.status(400).json({ success: false, error: 'Progress percentage and note are required' })
         }
 
         request.workOrder.updates.push({
-          progressPercent: Number(progressPercent),
+          progressPercent: numericProgress,
           note,
           createdBy: actorName,
           createdAt: new Date()
