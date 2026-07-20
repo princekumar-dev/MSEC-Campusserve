@@ -183,7 +183,7 @@ function AppContent() {
         <div className={`layout-container flex min-h-screen flex-col max-w-full ${isAuthPage ? 'relative z-10' : `app-shell text-slate-800 ${roleClass}`}`}>
           <Header />
           <main className="flex w-full flex-1 justify-center">
-            <div className={`layout-content-container flex w-full max-w-7xl flex-col px-4 py-6 page-enter ${!isAuthPage ? 'pb-24 md:pb-6' : ''}`}>
+            <div className={`layout-content-container flex min-w-0 w-full max-w-7xl flex-col px-3 py-4 sm:px-4 sm:py-6 page-enter ${!isAuthPage ? 'pb-24 md:pb-6' : ''}`}>
               <Suspense fallback={
                 <div className="flex items-center justify-center min-h-[60vh]">
                   <div className="bg-white rounded-2xl shadow-lg px-10 py-10 flex flex-col items-center gap-4">

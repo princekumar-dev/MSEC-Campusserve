@@ -12,9 +12,10 @@ export default async function handler(req, res) {
   }
 
   const { action, id, requestId } = req.query
-  const actorId = req.headers['x-user-id'] || 'system'
-  const actor = await User.findById(actorId).lean()
+  const actorId = req.user ? req.user.id : (req.headers['x-user-id'] || 'system')
+  const actor = req.user || await User.findById(actorId).lean()
   const actorName = actor ? actor.name : 'Unknown User'
+  const actorRole = req.user ? req.user.role : ''
 
   try {
     // 1. Create or Revise Invoice
@@ -92,6 +93,19 @@ export default async function handler(req, res) {
       const request = await ServiceRequest.findById(id)
       if (!request) return res.status(404).json({ success: false, error: 'Request not found' })
       if (!request.invoice) return res.status(400).json({ success: false, error: 'No invoice found for this request' })
+
+      // Role authorization for invoice actions
+      const invoiceRoles = {
+        'approve': ['admin', 'super_admin', 'accounts'],
+        'reject': ['admin', 'super_admin', 'accounts'],
+        'revise': ['admin', 'super_admin', 'accounts'],
+        'submit': ['manager', 'admin', 'super_admin', 'vendor']
+      }
+      if (invoiceRoles[action]) {
+        if (!invoiceRoles[action].includes(actorRole)) {
+          return res.status(403).json({ success: false, error: `Action '${action}' requires one of these roles: ${invoiceRoles[action].join(', ')}` })
+        }
+      }
 
       const oldStatus = request.status
 

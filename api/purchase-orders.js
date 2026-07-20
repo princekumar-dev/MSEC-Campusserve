@@ -8,9 +8,9 @@ export default async function handler(req, res) {
     return res.status(503).json({ success: false, error: 'Database connection failed' })
   }
 
-  const actorId = req.headers['x-user-id'] || 'system'
-  const userRole = req.headers['x-user-role']
-  const actor = await User.findById(actorId).lean()
+  const actorId = req.user ? req.user.id : (req.headers['x-user-id'] || 'system')
+  const userRole = req.user ? req.user.role : (req.headers['x-user-role'] || '')
+  const actor = req.user || await User.findById(actorId).lean()
   const actorName = actor ? actor.name : 'Unknown'
 
   const pushHistory = (po, oldStatus, newStatus, comment) => {
@@ -86,6 +86,19 @@ export default async function handler(req, res) {
       const po = await PurchaseOrder.findById(id)
       if (!po) return res.status(404).json({ success: false, error: 'PO not found' })
       const oldStatus = po.status
+
+      // Role authorization for PO actions
+      const poRoles = {
+        'approve': ['admin', 'super_admin'],
+        'reject': ['admin', 'super_admin'],
+        'request-revision': ['admin', 'super_admin'],
+        'send-to-vendor': ['admin', 'super_admin', 'manager']
+      }
+      if (poRoles[action]) {
+        if (!poRoles[action].includes(userRole)) {
+          return res.status(403).json({ success: false, error: `Action '${action}' requires one of these roles: ${poRoles[action].join(', ')}` })
+        }
+      }
 
       if (action === 'submit') {
         if (po.status !== 'DRAFT' && po.status !== 'REVISION_REQUIRED') {

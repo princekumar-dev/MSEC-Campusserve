@@ -11,8 +11,8 @@ export default async function handler(req, res) {
     return res.status(503).json({ success: false, error: 'Database connection failed' })
   }
 
-  const userId = req.headers['x-user-id']
-  const userRole = req.headers['x-user-role']
+  const userId = req.user ? req.user.id : (req.headers['x-user-id'] || '')
+  const userRole = req.user ? req.user.role : (req.headers['x-user-role'] || '')
 
   try {
     if (req.method === 'GET') {
@@ -50,9 +50,9 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       const { action, id } = req.query
-      const actorId = req.headers['x-user-id'] || 'system'
+      const actorId = req.user ? req.user.id : (req.headers['x-user-id'] || 'system')
       
-      const actor = await User.findById(actorId).lean()
+      const actor = req.user || await User.findById(actorId).lean()
       const actorName = actor ? actor.name : 'Unknown User'
 
       // 1. Create New Request
@@ -109,6 +109,22 @@ export default async function handler(req, res) {
       }
 
       const oldStatus = request.status
+
+      // Role-based authorization for privileged actions
+      const privilegedActions = {
+        'approve': ['admin', 'super_admin'],
+        'reject': ['admin', 'super_admin'],
+        'clarify': ['admin', 'super_admin', 'manager'],
+        'assign-manager': ['admin', 'super_admin'],
+        'inspect': ['admin', 'super_admin', 'manager'],
+        'verify': ['requester', 'admin', 'super_admin']
+      }
+      if (privilegedActions[action]) {
+        const allowed = privilegedActions[action]
+        if (!allowed.includes(userRole)) {
+          return res.status(403).json({ success: false, error: `Action '${action}' requires one of these roles: ${allowed.join(', ')}` })
+        }
+      }
 
       if (action === 'submit') {
         request.status = 'SUBMITTED'

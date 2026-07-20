@@ -28,7 +28,7 @@ function Header() {
 
   // Fetch notification count
   useEffect(() => {
-    if (!user) return
+    if (!user || !user.token) return
     const fetchCount = () => {
       apiClient.get('/api/notifications?action=count').then(res => {
         if (res.success) setNotifCount(res.unreadCount || 0)

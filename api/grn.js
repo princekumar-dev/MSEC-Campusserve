@@ -8,8 +8,8 @@ export default async function handler(req, res) {
     return res.status(503).json({ success: false, error: 'Database connection failed' })
   }
 
-  const actorId = req.headers['x-user-id'] || 'system'
-  const actor = await User.findById(actorId).lean()
+  const actorId = req.user ? req.user.id : (req.headers['x-user-id'] || 'system')
+  const actor = req.user || await User.findById(actorId).lean()
   const actorName = actor ? actor.name : 'Unknown'
 
   try {

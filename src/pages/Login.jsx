@@ -24,6 +24,7 @@ function Login() {
       if (res.success && res.user) {
         const authData = {
           isAuthenticated: true,
+          token: res.token || '',
           id: res.user.id,
           email: res.user.email,
           name: res.user.name,

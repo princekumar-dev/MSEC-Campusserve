@@ -1,6 +1,7 @@
 import { connectToDatabase } from '../lib/mongo.js'
 import { User } from '../models.js'
 import bcrypt from 'bcryptjs'
+import { generateToken } from '../lib/auth.js'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -45,8 +46,11 @@ export default async function handler(req, res) {
         })
       }
 
+      const token = generateToken(user)
+
       return res.status(200).json({
         success: true,
+        token,
         user: {
           id: user._id,
           email: user.email,

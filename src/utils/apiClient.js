@@ -14,10 +14,10 @@ function buildUrl(url) {
 
 function getAuthHeaders() {
   const auth = getAuthOrNull();
-  if (!auth) return {};
+  if (!auth || !auth.token) return {};
   
   return {
-    'Authorization': `Bearer ${auth.token || auth.id || ''}`,
+    'Authorization': `Bearer ${auth.token}`,
     'X-User-Id': auth.id || '',
     'X-User-Role': auth.role || '',
     'X-User-Email': auth.email || ''
@@ -106,6 +106,21 @@ async function request(method, url, opts = {}) {
 
         if (!res.ok) {
           const errData = await res.json().catch(() => null);
+          
+          // If 401, clear stale auth and redirect to login
+          if (res.status === 401) {
+            try {
+              localStorage.removeItem('auth')
+              localStorage.removeItem('isLoggedIn')
+              localStorage.removeItem('userRole')
+              localStorage.removeItem('userId')
+              window.dispatchEvent(new Event('authStateChanged'))
+              if (window.location.pathname !== '/login') {
+                window.location.href = '/login'
+              }
+            } catch (e) {}
+          }
+          
           const e = new Error();
           e.status = res.status;
           e.data = errData;
@@ -183,9 +198,11 @@ async function request(method, url, opts = {}) {
           throw timeoutErr;
         }
         
-        // Never retry on AbortError - the timeout already fired so retrying won't help
-        // Only retry on actual network/server errors with exponential backoff
-        if (attempt > retry) {
+        // Client errors are deterministic. Retrying them (especially 429s) only
+        // consumes more of the rate-limit budget and delays the useful error.
+        // Retry only network failures and transient server errors.
+        const isRetryable = !err?.status || err.status >= 500;
+        if (!isRetryable || attempt > retry) {
           throw err;
         }
         
@@ -201,14 +218,18 @@ async function request(method, url, opts = {}) {
   // Keep the inFlight entry until the promise fully settles. Previously
   // the entry was deleted inside the retry loop's finally, which allowed
   // duplicate requests to start while retries were still ongoing.
-  p.finally(() => {
+  const cleanup = () => {
     try { inFlight.delete(key); } catch (e) { /* ignore */ }
     const updatedCount = Math.max(0, Number(window.__activeApiRequests || 0) - 1);
     window.__activeApiRequests = updatedCount;
     try {
       window.dispatchEvent(new CustomEvent('apiProgress', { detail: { count: updatedCount } }));
     } catch (e) {}
-  });
+  };
+  // `p.finally(cleanup)` creates a second rejected promise when the request
+  // fails. If nobody observes that derived promise the browser reports an
+  // "Uncaught (in promise)" even though the caller handled the original one.
+  p.then(cleanup, cleanup);
 
   return p;
 }

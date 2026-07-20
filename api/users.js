@@ -90,12 +90,18 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
+      // Only admin/super_admin can create users
+      const requestingRole = req.user ? req.user.role : (req.headers['x-user-role'] || '')
+      if (!['admin', 'super_admin'].includes(requestingRole)) {
+        return res.status(403).json({ success: false, error: 'Only admin can create users' })
+      }
+
       const { name, email, password, role, department, phoneNumber } = req.body
       if (!name || !email || !password || !role || !department) {
         return res.status(400).json({ success: false, error: 'name, email, password, role and department are required' })
       }
 
-      const validRoles = ['admin', 'requester', 'manager', 'technician', 'accounts', 'vendor', 'super_admin']
+      const validRoles = ['admin', 'requester', 'manager', 'technician', 'accounts', 'vendor', 'super_admin', 'gate', 'receiving_officer', 'delivery_person', 'hod', 'staff']
       if (!validRoles.includes(role)) {
         return res.status(400).json({ success: false, error: `role must be one of: ${validRoles.join(', ')}` })
       }
@@ -130,18 +136,13 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'DELETE') {
-      const { userId } = req.body || {}
-      if (!userId) return res.status(400).json({ success: false, error: 'userId required' })
+      // Only admin can delete users
+      const requestingRole = req.user ? req.user.role : (req.headers['x-user-role'] || '')
+      if (!['admin', 'super_admin'].includes(requestingRole)) {
+        return res.status(403).json({ success: false, error: 'Only admin can delete users' })
+      }
 
       try {
-        const requestingUser = await User.findById(userId).select('_id role').lean()
-        if (!requestingUser) {
-          return res.status(401).json({ success: false, error: 'User not found' })
-        }
-        if (String(requestingUser.role || '').toLowerCase() !== 'admin') {
-          return res.status(403).json({ success: false, error: 'Only admin can delete users' })
-        }
-
         const userIdToDelete = req.query?.id
         if (!userIdToDelete) return res.status(400).json({ success: false, error: 'id (user to delete) required' })
 
@@ -160,16 +161,17 @@ export default async function handler(req, res) {
       if (!action) return res.status(400).json({ success: false, error: 'action required' })
 
       if (action === 'admin-reset-password') {
-        const { adminUserId, targetUserId, newPassword } = req.body || {}
-        if (!adminUserId || !targetUserId || !newPassword) {
-          return res.status(400).json({ success: false, error: 'adminUserId, targetUserId and newPassword are required' })
+        const { targetUserId, newPassword } = req.body || {}
+        const adminUserId = req.user ? req.user.id : (req.body.adminUserId || '')
+        if (!targetUserId || !newPassword) {
+          return res.status(400).json({ success: false, error: 'targetUserId and newPassword are required' })
         }
         if (newPassword.length < 6) {
           return res.status(400).json({ success: false, error: 'New password must be at least 6 characters' })
         }
 
-        const adminUser = await User.findById(adminUserId).select('_id role').lean()
-        if (!adminUser || String(adminUser.role || '').toLowerCase() !== 'admin') {
+        const adminUser = req.user || await User.findById(adminUserId).select('_id role').lean()
+        if (!adminUser || !['admin', 'super_admin'].includes(adminUser.role)) {
           return res.status(403).json({ success: false, error: 'Only admin can change user passwords' })
         }
 

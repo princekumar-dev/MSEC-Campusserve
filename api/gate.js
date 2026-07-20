@@ -11,8 +11,8 @@ export default async function handler(req, res) {
     return res.status(503).json({ success: false, error: 'Database connection failed' })
   }
 
-  const actorId = req.headers['x-user-id'] || 'system'
-  const actor = await User.findById(actorId).lean()
+  const actorId = req.user ? req.user.id : (req.headers['x-user-id'] || 'system')
+  const actor = req.user || await User.findById(actorId).lean()
   const actorName = actor ? actor.name : 'Unknown'
 
   try {
@@ -64,6 +64,8 @@ export default async function handler(req, res) {
       const ds = await DeliverySchedule.findById(deliveryScheduleId)
       if (!ds) return res.status(404).json({ success: false, error: 'Delivery not found' })
 
+      const oldStatusBeforeReject = ds.status
+
       const entry = new GateEntry({
         deliveryScheduleId, poId: ds.poId, poNumber: ds.poNumber,
         verificationMethod: method || 'MANUAL_CODE', decision: 'REJECTED', rejectionReason: reason,
@@ -73,7 +75,7 @@ export default async function handler(req, res) {
       await entry.save()
 
       ds.status = 'ENTRY_REJECTED'
-      ds.statusHistory.push({ oldStatus: ds.status, newStatus: 'ENTRY_REJECTED', actorId, actorName, comment: `Entry rejected: ${reason}`, createdAt: new Date() })
+      ds.statusHistory.push({ oldStatus: oldStatusBeforeReject, newStatus: 'ENTRY_REJECTED', actorId, actorName, comment: `Entry rejected: ${reason}`, createdAt: new Date() })
       await ds.save()
 
       return res.json({ success: true, decision: 'REJECTED', reason, data: entry })

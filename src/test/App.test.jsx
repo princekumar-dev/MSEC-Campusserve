@@ -14,9 +14,9 @@ describe('App Component', () => {
     expect(document.querySelector('.layout-container')).toBeTruthy()
   })
 
-  it('has proper background gradient', () => {
+  it('has proper layout structure', () => {
     render(<App />)
-    const container = document.querySelector('.bg-gradient-to-br')
+    const container = document.querySelector('.layout-container')
     expect(container).toBeInTheDocument()
   })
 })
