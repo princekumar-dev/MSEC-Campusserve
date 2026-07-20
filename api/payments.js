@@ -15,6 +15,7 @@ export default async function handler(req, res) {
   const actorId = req.user ? req.user.id : (req.headers['x-user-id'] || 'system')
   const actor = req.user || await User.findById(actorId).lean()
   const actorName = actor ? actor.name : 'Unknown User'
+  const actorRole = req.user ? req.user.role : (req.headers['x-user-role'] || '')
 
   try {
     if (req.method === 'POST') {
@@ -23,6 +24,8 @@ export default async function handler(req, res) {
       const request = await ServiceRequest.findById(id)
       if (!request) return res.status(404).json({ success: false, error: 'Request not found' })
       if (!request.invoice) return res.status(400).json({ success: false, error: 'Invoice must be created and approved before recording payment' })
+      if (!['accounts', 'admin', 'super_admin'].includes(actorRole)) return res.status(403).json({ success: false, error: 'Only accounts or an administrator can record payments' })
+      if (request.invoice.status !== 'APPROVED' || !['PAYMENT_PENDING', 'PARTIALLY_PAID'].includes(request.status)) return res.status(409).json({ success: false, error: 'Payments can only be recorded against an approved, outstanding invoice' })
 
       const { amount, method, referenceNumber, notes } = req.body
       if (!amount || !method) {
@@ -30,8 +33,11 @@ export default async function handler(req, res) {
       }
 
       const paymentAmt = Number(amount)
-      if (paymentAmt <= 0) {
+      if (!Number.isFinite(paymentAmt) || paymentAmt <= 0) {
         return res.status(400).json({ success: false, error: 'Payment amount must be greater than zero' })
+      }
+      if (paymentAmt > request.invoice.balanceDue) {
+        return res.status(400).json({ success: false, error: 'Payment amount cannot exceed the outstanding balance' })
       }
 
       const year = new Date().getFullYear()

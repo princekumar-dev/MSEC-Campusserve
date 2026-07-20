@@ -25,7 +25,7 @@ export default function ForgotPassword() {
   if (sent) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 max-w-md w-full text-center space-y-4">
+        <div className="w-full max-w-md space-y-4 rounded-2xl bg-white/95 p-5 text-center shadow-2xl backdrop-blur-sm sm:p-8">
           <div className="p-4 bg-emerald-50 rounded-full inline-flex mx-auto"><CheckCircle size={32} className="text-emerald-600" /></div>
           <h1 className="font-display font-black text-xl text-slate-800">Check Your Email</h1>
           <p className="text-sm text-slate-500">If an account exists with <strong>{email}</strong>, we've sent password reset instructions.</p>
@@ -37,7 +37,7 @@ export default function ForgotPassword() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 max-w-md w-full space-y-6">
+      <div className="w-full max-w-md space-y-6 rounded-2xl bg-white/95 p-5 shadow-2xl backdrop-blur-sm sm:p-8">
         <div className="text-center">
           <div className="p-4 bg-violet-50 rounded-full inline-flex mx-auto mb-4"><Mail size={28} className="text-violet-600" /></div>
           <h1 className="font-display font-black text-xl text-slate-800">Forgot Password</h1>

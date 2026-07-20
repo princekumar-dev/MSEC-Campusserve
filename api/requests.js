@@ -110,6 +110,17 @@ export default async function handler(req, res) {
 
       const oldStatus = request.status
 
+      const isAdmin = ['admin', 'super_admin'].includes(userRole)
+      const isOwner = String(request.requesterId) === String(actorId)
+      const isAssignedManager = String(request.assignedManagerId || '') === String(actorId)
+      const requireStatus = (allowedStatuses) => {
+        if (allowedStatuses.includes(request.status)) return null
+        return res.status(409).json({
+          success: false,
+          error: `Action '${action}' is not available while the request is ${request.status.replace(/_/g, ' ').toLowerCase()}`
+        })
+      }
+
       // Role-based authorization for privileged actions
       const privilegedActions = {
         'approve': ['admin', 'super_admin'],
@@ -126,7 +137,19 @@ export default async function handler(req, res) {
         }
       }
 
+      if (['submit', 'cancel'].includes(action) && !isOwner && !isAdmin) {
+        return res.status(403).json({ success: false, error: 'Only the requester or an administrator can perform this action' })
+      }
+      if (action === 'inspect' && !isAdmin && !isAssignedManager) {
+        return res.status(403).json({ success: false, error: 'Only the assigned manager can inspect this request' })
+      }
+      if (action === 'verify' && !isAdmin && !isOwner) {
+        return res.status(403).json({ success: false, error: 'Only the original requester can verify completion' })
+      }
+
       if (action === 'submit') {
+        const invalid = requireStatus(['DRAFT', 'CLARIFICATION_REQUIRED'])
+        if (invalid) return invalid
         request.status = 'SUBMITTED'
         request.submittedAt = new Date()
         request.statusHistory.push({
@@ -138,6 +161,8 @@ export default async function handler(req, res) {
         })
       } 
       else if (action === 'cancel') {
+        const invalid = requireStatus(['DRAFT', 'SUBMITTED', 'CLARIFICATION_REQUIRED'])
+        if (invalid) return invalid
         request.status = 'CANCELLED'
         request.statusHistory.push({
           oldStatus,
@@ -148,6 +173,8 @@ export default async function handler(req, res) {
         })
       } 
       else if (action === 'approve') {
+        const invalid = requireStatus(['SUBMITTED', 'REOPENED'])
+        if (invalid) return invalid
         request.status = 'APPROVED'
         request.statusHistory.push({
           oldStatus,
@@ -158,6 +185,8 @@ export default async function handler(req, res) {
         })
       } 
       else if (action === 'reject') {
+        const invalid = requireStatus(['SUBMITTED', 'REOPENED'])
+        if (invalid) return invalid
         if (!req.body.comment) return res.status(400).json({ success: false, error: 'Rejection comment is required' })
         request.status = 'REJECTED'
         request.statusHistory.push({
@@ -169,6 +198,8 @@ export default async function handler(req, res) {
         })
       } 
       else if (action === 'clarify') {
+        const invalid = requireStatus(['SUBMITTED'])
+        if (invalid) return invalid
         if (!req.body.comment) return res.status(400).json({ success: false, error: 'Clarification details are required' })
         request.status = 'CLARIFICATION_REQUIRED'
         request.statusHistory.push({
@@ -180,11 +211,13 @@ export default async function handler(req, res) {
         })
       } 
       else if (action === 'assign-manager') {
+        const invalid = requireStatus(['APPROVED'])
+        if (invalid) return invalid
         const { managerId } = req.body
         if (!managerId) return res.status(400).json({ success: false, error: 'Manager ID is required' })
         
         const manager = await User.findById(managerId).lean()
-        if (!manager) return res.status(404).json({ success: false, error: 'Manager user not found' })
+        if (!manager || manager.role !== 'manager') return res.status(404).json({ success: false, error: 'Manager user not found' })
 
         request.assignedManagerId = manager._id
         request.assignedManagerName = manager.name
@@ -200,6 +233,8 @@ export default async function handler(req, res) {
         })
       } 
       else if (action === 'inspect') {
+        const invalid = requireStatus(['ASSIGNED_TO_MANAGER'])
+        if (invalid) return invalid
         const { diagnosis, recommendation, estimatedDurationHours, serviceMode } = req.body
         if (!diagnosis || !recommendation || !serviceMode) {
           return res.status(400).json({ success: false, error: 'Missing inspection details' })
@@ -223,14 +258,17 @@ export default async function handler(req, res) {
         })
       } 
       else if (action === 'verify') {
+        const invalid = requireStatus(['TECHNICIAN_COMPLETED'])
+        if (invalid) return invalid
         const { result, rating, comment } = req.body
-        if (!result || !rating) {
+        const numericRating = Number(rating)
+        if (!['RESOLVED', 'PARTIALLY_RESOLVED', 'UNRESOLVED'].includes(result) || !Number.isFinite(numericRating) || numericRating < 1 || numericRating > 5) {
           return res.status(400).json({ success: false, error: 'Verification result and rating are required' })
         }
 
         request.requesterVerification = {
           result,
-          rating: Number(rating),
+          rating: numericRating,
           comment,
           verifiedBy: actorName,
           verifiedAt: new Date()
@@ -265,6 +303,11 @@ export default async function handler(req, res) {
 
       const request = await ServiceRequest.findById(id)
       if (!request) return res.status(404).json({ success: false, error: 'Request not found' })
+
+      const isAdmin = ['admin', 'super_admin'].includes(userRole)
+      if (String(request.requesterId) !== String(userId) && !isAdmin) {
+        return res.status(403).json({ success: false, error: 'Only the requester or an administrator can edit this request' })
+      }
 
       if (request.status !== 'DRAFT' && request.status !== 'CLARIFICATION_REQUIRED') {
         return res.status(400).json({ success: false, error: 'Only drafts or requests needing clarification can be modified' })
