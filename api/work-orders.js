@@ -1,5 +1,6 @@
 import { connectToDatabase } from '../lib/mongo.js'
 import { ServiceRequest, User } from '../models.js'
+import { finalizeRequestWorkflow } from '../lib/workflowEngine.js'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
@@ -22,7 +23,7 @@ export default async function handler(req, res) {
     if (req.method === 'POST' && !action && requestId) {
       const request = await ServiceRequest.findById(requestId)
       if (!request) return res.status(404).json({ success: false, error: 'Request not found' })
-      if (!['manager', 'admin', 'super_admin'].includes(actorRole)) return res.status(403).json({ success: false, error: 'Only a manager or administrator can create a work order' })
+      if (actorRole !== 'super_admin') return res.status(403).json({ success: false, error: 'Managers generate purchase orders directly for assigned requests' })
       if (request.status !== 'QUOTATION_APPROVED') return res.status(409).json({ success: false, error: 'A work order can only be created after quotation approval' })
       if (request.workOrder?.workOrderNumber) return res.status(409).json({ success: false, error: 'A work order already exists for this request' })
 
@@ -69,6 +70,7 @@ export default async function handler(req, res) {
         comment: `Work order created. Assigned Technician: ${techName || 'None'}`
       })
 
+      await finalizeRequestWorkflow(request, { id: actorId, name: actorName, role: actorRole })
       await request.save()
       return res.status(200).json({ success: true, data: request })
     }
@@ -81,8 +83,9 @@ export default async function handler(req, res) {
 
       // Role authorization for work order actions
       const workOrderRoles = {
-        'approve-cost': ['admin', 'super_admin'],
-        'reject-cost': ['admin', 'super_admin']
+        'approve-cost': ['super_admin'],
+        'reject-cost': ['super_admin'],
+        'reassign': ['super_admin']
       }
       if (workOrderRoles[action]) {
         if (!workOrderRoles[action].includes(actorRole)) {
@@ -93,7 +96,7 @@ export default async function handler(req, res) {
       const oldStatus = request.status
       const assignedTechnician = String(request.workOrder.technicianId || '') === String(actorId)
       const technicianActions = ['accept', 'decline', 'start', 'pause', 'resume', 'update', 'material', 'additional-cost', 'complete']
-      if (technicianActions.includes(action) && !['admin', 'super_admin'].includes(actorRole) && !(actorRole === 'technician' && assignedTechnician)) {
+      if (technicianActions.includes(action) && actorRole !== 'super_admin' && !(actorRole === 'technician' && assignedTechnician)) {
         return res.status(403).json({ success: false, error: 'Only the assigned technician can perform this action' })
       }
 
@@ -101,7 +104,8 @@ export default async function handler(req, res) {
         accept: ['TECHNICIAN_ASSIGNED'], decline: ['TECHNICIAN_ASSIGNED'], start: ['WORK_ACCEPTED'],
         pause: ['IN_PROGRESS'], resume: ['PAUSED'], update: ['IN_PROGRESS'], material: ['IN_PROGRESS'],
         'additional-cost': ['IN_PROGRESS'], 'approve-cost': ['ADDITIONAL_COST_PENDING'],
-        'reject-cost': ['ADDITIONAL_COST_PENDING'], complete: ['IN_PROGRESS']
+        'reject-cost': ['ADDITIONAL_COST_PENDING'], complete: ['IN_PROGRESS'],
+        reassign: ['WORK_DECLINED', 'WORK_ORDER_CREATED']
       }
       if (allowedStatuses[action] && !allowedStatuses[action].includes(request.status)) {
         return res.status(409).json({ success: false, error: `Action '${action}' is not available while the work order is ${request.status.replace(/_/g, ' ').toLowerCase()}` })
@@ -132,6 +136,18 @@ export default async function handler(req, res) {
           actorName,
           comment: `Technician declined the work order. Reason: ${reason}`
         })
+      }
+      else if (action === 'reassign') {
+        const { technicianId } = req.body
+        if (!technicianId) return res.status(400).json({ success: false, error: 'Technician is required for reassignment' })
+        const technician = await User.findById(technicianId).lean()
+        if (!technician || technician.role !== 'technician' || technician.isActive === false) return res.status(400).json({ success: false, error: 'Select an active technician' })
+        request.workOrder.technicianId = technician._id
+        request.workOrder.technicianName = technician.name
+        request.workOrder.status = 'ASSIGNED'
+        request.workOrder.declineReason = ''
+        request.status = 'TECHNICIAN_ASSIGNED'
+        request.statusHistory.push({ oldStatus, newStatus: 'TECHNICIAN_ASSIGNED', actorId, actorName, comment: `Work order reassigned to ${technician.name}` })
       }
       else if (action === 'start') {
         request.workOrder.status = 'IN_PROGRESS'
@@ -304,6 +320,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: 'Invalid action' })
       }
 
+      await finalizeRequestWorkflow(request, { id: actorId, name: actorName, role: actorRole })
       await request.save()
       return res.status(200).json({ success: true, data: request })
     }

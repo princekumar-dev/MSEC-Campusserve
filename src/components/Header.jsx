@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Bell, ChevronDown, ClipboardList, LogOut, Menu, PlusCircle, X, ShoppingCart, Building2, Truck, QrCode, ClipboardCheck } from 'lucide-react'
 import { getAuthOrNull } from '../utils/auth'
 import Settings from './Settings'
+import CampusServeNotifications from './CampusServeNotifications'
 import apiClient from '../utils/apiClient'
 
 function Header() {
@@ -13,6 +14,7 @@ function Header() {
   const [showDropdown, setShowDropdown] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [notifCount, setNotifCount] = useState(0)
   const dropdownRef = useRef(null)
 
@@ -30,13 +32,21 @@ function Header() {
   useEffect(() => {
     if (!user || !user.token) return
     const fetchCount = () => {
-      apiClient.get('/api/notifications?action=count').then(res => {
+      apiClient.get('/api/notifications?action=count', { cache: false, dedupe: false }).then(res => {
         if (res.success) setNotifCount(res.unreadCount || 0)
       }).catch(() => {})
     }
+    window.refreshNotificationCount = fetchCount
     fetchCount()
     const interval = setInterval(fetchCount, 30000) // poll every 30s
-    return () => clearInterval(interval)
+    window.addEventListener('notificationsUpdated', fetchCount)
+    window.addEventListener('requestsUpdated', fetchCount)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('notificationsUpdated', fetchCount)
+      window.removeEventListener('requestsUpdated', fetchCount)
+      if (window.refreshNotificationCount === fetchCount) delete window.refreshNotificationCount
+    }
   }, [user])
 
   useEffect(() => {
@@ -51,7 +61,14 @@ function Header() {
     setIsMobileMenuOpen(false)
     setShowDropdown(false)
     setIsSettingsOpen(false)
+    setIsNotificationsOpen(false)
   }, [location.pathname])
+
+  const toggleNotifications = () => {
+    setIsSettingsOpen(false)
+    setIsMobileMenuOpen(false)
+    setIsNotificationsOpen(value => !value)
+  }
 
   const handleLogout = () => {
     ;['auth', 'isLoggedIn', 'userEmail', 'userRole', 'userId'].forEach((key) => localStorage.removeItem(key))
@@ -72,8 +89,8 @@ function Header() {
       {/* Requester / HOD / Staff */}
       {['requester', 'hod', 'staff'].includes(user.role) && (
         <>
-          <Link className={linkClass('/requests')} to="/requests">My Requests</Link>
           <Link className={linkClass('/requests/new')} to="/requests/new">Submit Request</Link>
+          <Link className={linkClass('/requests')} to="/requests">My Requests</Link>
         </>
       )}
 
@@ -111,7 +128,6 @@ function Header() {
         <>
           <Link className={linkClass('/requests')} to="/requests">Requests</Link>
           <Link className={linkClass('/vendors')} to="/vendors">Vendors</Link>
-          <Link className={linkClass('/manager/quotations')} to="/manager/quotations">Quotations</Link>
           <Link className={linkClass('/purchase-orders')} to="/purchase-orders">POs</Link>
           <Link className={linkClass('/deliveries')} to="/deliveries">Deliveries</Link>
           <Link className={linkClass('/grn')} to="/grn">GRN</Link>
@@ -165,40 +181,40 @@ function Header() {
 
   return (
     <header
-      className="glass-card campusserve-header sticky top-0 z-50 mx-2 mt-2 flex items-center justify-between whitespace-nowrap px-3 py-3 sm:mx-3 sm:mt-3 sm:px-4 sm:py-4 md:mx-4 md:mt-4 md:px-6 lg:px-8 xl:px-10"
+      className="glass-card campusserve-header sticky top-0 z-50 mx-2 mt-2 grid min-h-[64px] grid-cols-[1fr_auto] items-center gap-3 whitespace-nowrap px-3 py-3 sm:mx-3 sm:mt-3 sm:px-4 md:mx-4 md:mt-4 md:px-6 lg:min-h-[72px] lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:gap-6 lg:px-8 xl:gap-10 xl:px-10"
       onMouseEnter={() => document.body.classList.add('header-hover-active')}
       onMouseLeave={() => document.body.classList.remove('header-hover-active')}
     >
-      <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4 md:gap-6 lg:gap-8">
-          <Link to={user ? '/dashboard' : '/'} className="flex flex-shrink-0 items-center gap-2 md:gap-3">
-            <span className="size-9 sm:size-10 md:size-10">
+      <Link to={user ? '/dashboard' : '/'} className="flex min-w-0 items-center gap-2.5 md:gap-3" aria-label="CampusServe home">
+            <span className="size-9 flex-shrink-0 sm:size-10">
               <img src="/images/mseclogo.png" alt="CampusServe Logo" className="h-full w-full object-contain" />
             </span>
-            <h2 className="whitespace-nowrap text-base font-bold leading-tight tracking-[-0.015em] sm:text-lg md:text-xl">
+            <h2 className="truncate whitespace-nowrap text-base font-bold leading-tight tracking-[-0.015em] sm:text-lg md:text-xl">
               <span className="text-[#111418]">MSEC</span> <span className="wave-text-violet">CampusServe</span>
             </h2>
-          </Link>
-          <nav className="hidden min-w-0 flex-shrink items-center gap-4 lg:flex xl:gap-5 2xl:gap-6">{navigation}</nav>
-      </div>
+      </Link>
 
-      <div className={`${isAuthPage ? 'hidden' : 'hidden lg:flex'} flex-shrink-0 items-center gap-2 lg:gap-3 xl:gap-4`}>
+      <nav className="campusserve-primary-nav hidden min-w-0 items-center justify-start gap-2 overflow-x-auto lg:flex xl:gap-3 2xl:gap-4" aria-label="Primary navigation">
+        {navigation}
+      </nav>
+
+      <div className={`${isAuthPage ? 'hidden' : 'hidden lg:flex'} items-center justify-end gap-2 border-l border-slate-200/80 pl-4 xl:gap-3 xl:pl-5`}>
           {user ? (
             <>
-              <div className="relative flex flex-shrink-0 items-center gap-1 lg:gap-2" ref={dropdownRef}>
-                <button className="relative hidden h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-[#f0f2f5] lg:flex lg:h-10 lg:w-10" aria-label="Notifications">
+              <div className="relative flex items-center gap-1.5" ref={dropdownRef}>
+                <button onClick={toggleNotifications} className={`relative hidden h-9 w-9 items-center justify-center rounded-lg transition-colors lg:flex lg:h-10 lg:w-10 ${isNotificationsOpen ? 'bg-violet-100 text-violet-700' : 'hover:bg-[#f0f2f5]'}`} aria-label="Notifications" aria-expanded={isNotificationsOpen}>
                   <Bell className="h-5 w-5 text-[#60758a] transition-colors hover:text-violet-600" />
                   {notifCount > 0 && (
                     <span className="absolute right-1.5 top-1.5 h-4 w-4 flex items-center justify-center rounded-full border border-white bg-violet-600 text-[8px] font-black text-white">
                       {notifCount > 9 ? '9+' : notifCount}
                     </span>
                   )}
-                  {notifCount === 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border border-white bg-violet-600" />}
                 </button>
-                <button onClick={() => setIsSettingsOpen((value) => !value)} className="group flex h-9 items-center gap-2 rounded-lg px-2 transition-colors hover:bg-[#f0f2f5] lg:h-10 lg:px-3" title="Settings">
+                <button onClick={() => setIsSettingsOpen((value) => !value)} className="group flex h-10 max-w-[230px] items-center gap-2 rounded-xl px-2.5 transition-colors hover:bg-[#f0f2f5]" title="Account settings" aria-expanded={isSettingsOpen}>
                   <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-700 text-xs font-bold text-white lg:h-8 lg:w-8 lg:text-sm">
                     {(user.name || user.email || 'U').charAt(0).toUpperCase()}
                   </span>
-                  <span className="hidden max-w-[120px] truncate text-xs font-medium text-[#111418] group-hover:text-violet-600 xl:inline lg:max-w-[150px]">{user.email}</span>
+                  <span className="hidden max-w-[150px] truncate text-xs font-medium text-[#111418] group-hover:text-violet-600 xl:inline 2xl:max-w-[190px]">{user.email}</span>
                   <ChevronDown className={`h-3 w-3 text-[#60758a] transition-transform lg:h-4 lg:w-4 ${isSettingsOpen ? 'rotate-180' : ''}`} />
                 </button>
               </div>
@@ -208,9 +224,14 @@ function Header() {
           )}
       </div>
 
-      <div className={`${isAuthPage ? 'hidden' : 'flex'} items-center gap-1 lg:hidden`}>
-        {user && <button className="relative flex flex-shrink-0 items-center justify-center rounded-lg p-1.5 text-[#111418] transition-colors duration-200 hover:bg-violet-50 sm:p-2" aria-label="Notifications"><Bell className="h-5 w-5 sm:h-6 sm:w-6" /><span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-violet-600" /></button>}
-        <button onClick={() => user ? setIsSettingsOpen(true) : setIsMobileMenuOpen((value) => !value)} className="flex flex-shrink-0 items-center justify-center rounded-lg p-1.5 text-[#111418] transition-colors duration-200 hover:bg-violet-50 sm:p-2" aria-label={user ? 'Open settings' : 'Toggle navigation menu'}>
+      <div className={`${isAuthPage ? 'hidden' : 'flex'} items-center justify-end gap-1 lg:hidden`}>
+        {user && <button onClick={toggleNotifications} className={`relative flex flex-shrink-0 items-center justify-center rounded-lg p-1.5 text-[#111418] transition-colors duration-200 sm:p-2 ${isNotificationsOpen ? 'bg-violet-100 text-violet-700' : 'hover:bg-violet-50'}`} aria-label="Notifications" aria-expanded={isNotificationsOpen}><Bell className="h-5 w-5 sm:h-6 sm:w-6" />{notifCount > 0 && <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full border border-white bg-violet-600 px-0.5 text-[8px] font-black text-white">{notifCount > 9 ? '9+' : notifCount}</span>}</button>}
+        {user && (
+          <button onClick={() => setIsSettingsOpen(true)} className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-700 text-xs font-bold text-white sm:h-9 sm:w-9" aria-label="Open account settings">
+            {(user.name || user.email || 'U').charAt(0).toUpperCase()}
+          </button>
+        )}
+        <button onClick={() => setIsMobileMenuOpen((value) => !value)} className="flex flex-shrink-0 items-center justify-center rounded-lg p-1.5 text-[#111418] transition-colors duration-200 hover:bg-violet-50 sm:p-2" aria-label="Toggle navigation menu" aria-expanded={isMobileMenuOpen}>
           {isMobileMenuOpen ? <X className="h-5 w-5 sm:h-6 sm:w-6" /> : <Menu className="h-5 w-5 sm:h-6 sm:w-6" />}
         </button>
       </div>
@@ -235,6 +256,14 @@ function Header() {
           userEmail={user.email}
           userRole={user.role}
           isMobile={typeof window !== 'undefined' && window.innerWidth < 1024}
+        />
+      )}
+
+      {user && isNotificationsOpen && (
+        <CampusServeNotifications
+          isOpen
+          onClose={() => setIsNotificationsOpen(false)}
+          setUnreadCount={setNotifCount}
         />
       )}
     </header>

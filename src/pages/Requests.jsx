@@ -4,8 +4,10 @@ import { useAlert } from '../components/AlertContext'
 import apiClient from '../utils/apiClient'
 import { getAuthOrNull } from '../utils/auth'
 import { formatDistanceToNow } from 'date-fns'
-import { Search, PlusCircle, ChevronRight, X, ChevronLeft, Filter, ClipboardList, ArrowRight } from 'lucide-react'
+import { Search, PlusCircle, ChevronRight, X, ChevronLeft, Filter, ClipboardList, ArrowRight, Sparkles, TimerReset, Pencil, Trash2 } from 'lucide-react'
 import { PageHeader } from '../components/ui'
+import ConfirmDialog from '../components/ConfirmDialog'
+import { getRoleActionStatuses, getWorkflowGuidance, getWorkflowPhase } from '../utils/workflowGuidance'
 
 const ALL_STATUSES = [
   'ALL', 'DRAFT', 'SUBMITTED', 'UNDER_ADMIN_REVIEW', 'CLARIFICATION_REQUIRED',
@@ -42,10 +44,13 @@ function Requests() {
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   const [selectedStatus, setSelectedStatus] = useState(searchParams.get('status') || 'ALL')
   const [selectedPriority, setSelectedPriority] = useState('ALL')
+  const [queueMode, setQueueMode] = useState(searchParams.get('queue') || 'ALL')
   const [currentPage, setCurrentPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [showFilters, setShowFilters] = useState(false)
-  const { showError } = useAlert()
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const { showError, showSuccess } = useAlert()
   const auth = getAuthOrNull()
   const searchRef = useRef(null)
 
@@ -61,10 +66,7 @@ function Requests() {
     const fetchRequests = async () => {
       setIsLoading(true)
       try {
-        const queryParams = {}
-        if (selectedStatus !== 'ALL') queryParams.status = selectedStatus
-        if (selectedPriority !== 'ALL') queryParams.priority = selectedPriority
-        const res = await apiClient.get('/api/requests', { params: queryParams })
+        const res = await apiClient.get('/api/requests')
         if (res.success) {
           setRequests(res.data)
           const counts = {}
@@ -83,10 +85,14 @@ function Requests() {
       }
     }
     fetchRequests()
-  }, [selectedStatus, selectedPriority, showError])
+  }, [showError])
 
   const filteredRequests = useMemo(() => {
+    const myActionStatuses = getRoleActionStatuses(auth?.role)
     return requests.filter(req => {
+      if (selectedStatus !== 'ALL' && req.status !== selectedStatus) return false
+      if (selectedPriority !== 'ALL' && req.priority !== selectedPriority) return false
+      if (queueMode === 'MY_ACTIONS' && !myActionStatuses.includes(req.status)) return false
       const q = searchQuery.toLowerCase()
       if (!q) return true
       return (
@@ -97,7 +103,7 @@ function Requests() {
         req.category?.toLowerCase().includes(q)
       )
     })
-  }, [requests, searchQuery])
+  }, [requests, searchQuery, selectedStatus, selectedPriority, queueMode, auth?.role])
 
   const totalPages = Math.ceil(filteredRequests.length / ITEMS_PER_PAGE)
   const paginatedRequests = filteredRequests.slice(
@@ -106,6 +112,17 @@ function Requests() {
   )
 
   useEffect(() => { setCurrentPage(1) }, [searchQuery, selectedStatus, selectedPriority])
+
+  const myActionStatuses = getRoleActionStatuses(auth?.role)
+  const myActionCount = requests.filter(req => myActionStatuses.includes(req.status)).length
+  const handleQueueMode = mode => {
+    setQueueMode(mode)
+    setCurrentPage(1)
+    const next = new URLSearchParams(searchParams)
+    if (mode === 'MY_ACTIONS') next.set('queue', 'MY_ACTIONS')
+    else next.delete('queue')
+    setSearchParams(next)
+  }
 
   const handleStatusFilter = (status) => {
     setSelectedStatus(status)
@@ -126,19 +143,77 @@ function Requests() {
     }
   }
 
+  const canManageRequest = (request) => String(request.requesterId) === String(auth?.id)
+
+  const canEditRequest = (request) => {
+    if (!canManageRequest(request)) return false
+    if (['DRAFT', 'CLARIFICATION_REQUIRED'].includes(request.status)) return true
+    const submittedAt = request.submittedAt || request.createdAt
+    return request.status === 'SUBMITTED' && Date.now() - new Date(submittedAt).getTime() <= 24 * 60 * 60 * 1000
+  }
+
+  const deleteRequest = async () => {
+    if (!deleteTarget) return
+    setIsDeleting(true)
+    try {
+      const res = await apiClient.del(`/api/requests?id=${deleteTarget._id}`)
+      if (res?.success) {
+        setRequests(current => current.filter(item => item._id !== deleteTarget._id))
+        setStatusCounts(current => ({
+          ...current,
+          ALL: Math.max(0, (current.ALL || 1) - 1),
+          [deleteTarget.status]: Math.max(0, (current[deleteTarget.status] || 1) - 1)
+        }))
+        showSuccess('Request deleted', `${deleteTarget.requestNumber} was permanently removed.`)
+        setDeleteTarget(null)
+      }
+    } catch (err) {
+      showError('Delete failed', err.message || 'Could not delete this request')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   return (
     <div className="space-y-6 page-enter">
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete this request?"
+        description={deleteTarget ? `${deleteTarget.requestNumber} will be permanently deleted along with its request history. This action cannot be undone.` : ''}
+        confirmLabel="Delete request"
+        cancelLabel="Keep request"
+        loading={isDeleting}
+        variant="danger"
+        onCancel={() => !isDeleting && setDeleteTarget(null)}
+        onConfirm={deleteRequest}
+      />
 
       <PageHeader
         title="Requests"
-        subtitle={`${filteredRequests.length} requests found`}
-        action={auth?.role === 'requester' ? (
+        action={['requester', 'hod', 'staff'].includes(auth?.role) ? (
           <Link to="/requests/new" className="btn-premium">
             <PlusCircle size={15} />
             <span>Create Request</span>
           </Link>
         ) : null}
       />
+
+      {/* Personal work queue */}
+      {myActionStatuses.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-violet-200 bg-violet-50/60 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-violet-600 p-2.5 text-white"><Sparkles size={17} /></div>
+            <div>
+              <p className="text-sm font-extrabold text-slate-900">My action queue</p>
+              <p className="text-xs text-slate-600">{myActionCount ? `${myActionCount} request${myActionCount === 1 ? '' : 's'} currently need your role.` : 'Nothing needs your role right now.'}</p>
+            </div>
+          </div>
+          <div className="flex rounded-xl border border-violet-200 bg-white p-1">
+            <button onClick={() => handleQueueMode('MY_ACTIONS')} className={`rounded-lg px-3 py-2 text-xs font-bold ${queueMode === 'MY_ACTIONS' ? 'bg-violet-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Needs my action ({myActionCount})</button>
+            <button onClick={() => handleQueueMode('ALL')} className={`rounded-lg px-3 py-2 text-xs font-bold ${queueMode === 'ALL' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>All records</button>
+          </div>
+        </div>
+      )}
 
       {/* Quick Filter Chips */}
       <div className="mobile-edge-scroll flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
@@ -272,6 +347,10 @@ function Requests() {
           <>
             <div className="space-y-3 p-3 sm:hidden">
               {paginatedRequests.map((req) => (
+                (() => {
+                  const guidance = getWorkflowGuidance(req.status, auth?.role)
+                  const phase = getWorkflowPhase(req.status)
+                  return (
                 <Link
                   key={req._id}
                   to={`/requests/${req._id}`}
@@ -294,15 +373,21 @@ function Requests() {
                     <span className={`status-badge status-${req.status.toLowerCase()}`}>
                       {req.status.replace(/_/g, ' ')}
                     </span>
+                    {req.isEscalated && <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-1 text-[10px] font-bold text-rose-700"><TimerReset size={10} /> Overdue</span>}
                     <span className="ml-auto text-[10px] text-slate-400">
                       {req.updatedAt ? formatDistanceToNow(new Date(req.updatedAt), { addSuffix: true }) : ''}
                     </span>
                   </div>
+                  <div className={`mt-3 rounded-lg px-3 py-2 text-[11px] ${guidance.isMyTurn ? 'bg-violet-50 font-semibold text-violet-700' : 'bg-slate-50 text-slate-500'}`}>
+                    <span className="font-bold">{guidance.isMyTurn ? 'Next: ' : phase ? `${phase.short}: ` : ''}</span>{guidance.title}
+                  </div>
                 </Link>
+                  )
+                })()
               ))}
             </div>
 
-            <div className="requests-table-scroll hidden overflow-x-auto sm:block">
+            <div className="requests-table-scroll hidden overflow-x-auto sm:block lg:overflow-x-hidden">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50">
@@ -318,7 +403,7 @@ function Requests() {
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {paginatedRequests.map((req) => (
-                    <tr key={req._id} className={`table-row-hover border-l-3 ${getPriorityBorder(req.priority)}`}>
+                    <tr key={req._id} className={`table-row-hover border-l-3 ${getPriorityBorder(req.priority)} ${getWorkflowGuidance(req.status, auth?.role).isMyTurn ? 'bg-violet-50/30' : ''}`}>
                       <td className="py-4 px-6">
                         <span className="font-mono text-xs text-violet-600 font-bold">{req.requestNumber}</span>
                       </td>
@@ -344,17 +429,30 @@ function Requests() {
                         <span className={`status-badge status-${req.status.toLowerCase()}`}>
                           {req.status.replace(/_/g, ' ')}
                         </span>
+                        {req.isEscalated && <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-1 text-[10px] font-bold text-rose-700"><TimerReset size={10} /> Overdue</span>}
                       </td>
                       <td className="py-4 px-2 hidden md:table-cell text-xs text-slate-400">
                         {req.updatedAt ? formatDistanceToNow(new Date(req.updatedAt), { addSuffix: true }) : '—'}
                       </td>
                       <td className="py-4 px-6 text-right">
-                        <Link
-                          to={`/requests/${req._id}`}
-                          className="inline-flex items-center gap-1 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs py-1.5 px-3 rounded-lg shadow-sm transition-all group"
-                        >
-                          View <ArrowRight size={10} className="group-hover:translate-x-0.5 transition-transform" />
-                        </Link>
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          {canEditRequest(req) && (
+                            <Link to={`/requests/${req._id}/edit`} title="Edit request" className="rounded-lg border border-violet-200 bg-violet-50 p-2 text-violet-700 hover:bg-violet-100">
+                              <Pencil size={13} />
+                            </Link>
+                          )}
+                          {canManageRequest(req) && (
+                            <button type="button" onClick={() => setDeleteTarget(req)} title="Delete request" className="rounded-lg border border-rose-200 bg-rose-50 p-2 text-rose-700 hover:bg-rose-100">
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                          <Link
+                            to={`/requests/${req._id}`}
+                            className="inline-flex items-center gap-1 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs py-1.5 px-3 rounded-lg shadow-sm transition-all group"
+                          >
+                            {getWorkflowGuidance(req.status, auth?.role).isMyTurn ? 'Take action' : 'View'} <ArrowRight size={10} className="group-hover:translate-x-0.5 transition-transform" />
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   ))}

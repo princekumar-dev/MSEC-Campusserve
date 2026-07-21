@@ -146,6 +146,11 @@ class PushNotificationManager {
       return null;
     }
 
+    if (import.meta.env.DEV) {
+      console.info('Service Worker registration skipped during development');
+      return null;
+    }
+
     try {
       const registration = await navigator.serviceWorker.register('/service-worker.js', {
         scope: '/'

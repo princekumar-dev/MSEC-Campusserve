@@ -4,34 +4,26 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAlert } from '../components/AlertContext'
 import apiClient from '../utils/apiClient'
 import { getAuthOrNull } from '../utils/auth'
+import { getWorkflowGuidance } from '../utils/workflowGuidance'
 import { formatDistanceToNow } from 'date-fns'
 import {
   ArrowLeft, CheckCircle2, AlertCircle, Wrench, Download, Clock,
   Plus, Trash2, IndianRupee, FileCheck, ChevronRight, Loader2,
-  AlertTriangle, Check, CheckCircle, Circle, User, Calendar, MapPin, Tag
+  AlertTriangle, Check, CheckCircle, Circle, User, Calendar, MapPin, Tag,
+  Paperclip, ExternalLink, TimerReset, ShieldCheck, Pencil, ImagePlus, Eye, X
 } from 'lucide-react'
 
 const WORKFLOW_STEPS = [
   { key: 'DRAFT', label: 'Draft', short: 'Draft' },
   { key: 'SUBMITTED', label: 'Submitted', short: 'Submit' },
-  { key: 'UNDER_ADMIN_REVIEW', label: 'Review', short: 'Review' },
-  { key: 'APPROVED', label: 'Approved', short: 'Approve' },
   { key: 'ASSIGNED_TO_MANAGER', label: 'Assigned', short: 'Assign' },
-  { key: 'UNDER_INSPECTION', label: 'Inspection', short: 'Inspect' },
-  { key: 'QUOTATION_SUBMITTED', label: 'Quotation', short: 'Quote' },
-  { key: 'QUOTATION_APPROVED', label: 'Quote Approved', short: 'Q.Approve' },
-  { key: 'WORK_ORDER_CREATED', label: 'Work Order', short: 'W.Order' },
-  { key: 'IN_PROGRESS', label: 'In Progress', short: 'Progress' },
-  { key: 'TECHNICIAN_COMPLETED', label: 'Completed', short: 'Done' },
-  { key: 'SERVICE_VERIFIED', label: 'Verified', short: 'Verify' },
-  { key: 'INVOICE_SUBMITTED', label: 'Invoice', short: 'Invoice' },
-  { key: 'PAYMENT_PENDING', label: 'Payment', short: 'Payment' },
+  { key: 'PURCHASE_ORDER_CREATED', label: 'PO Created', short: 'PO' },
   { key: 'CLOSED', label: 'Closed', short: 'Closed' },
 ]
 
 const STATUS_ORDER = WORKFLOW_STEPS.map(s => s.key)
 
-const TABS = ['Overview', 'Diagnosis', 'Quotation', 'Work Order', 'Invoice', 'Payments', 'History']
+const TABS = ['Overview', 'History']
 
 function ConfirmModal({ open, title, message, onConfirm, onCancel, loading }) {
   useEffect(() => {
@@ -85,10 +77,7 @@ function ConfirmModal({ open, title, message, onConfirm, onCancel, loading }) {
 
 function StatusTimeline({ currentStatus }) {
   const currentIdx = STATUS_ORDER.indexOf(currentStatus)
-  const altIdx = STATUS_ORDER.indexOf('UNDER_ADMIN_REVIEW')
-  const effectiveIdx = currentIdx >= 0 ? currentIdx : (
-    currentStatus === 'SUBMITTED' ? altIdx : -1
-  )
+  const effectiveIdx = currentIdx >= 0 ? currentIdx : -1
   const isRejected = ['REJECTED', 'CANCELLED'].includes(currentStatus)
   const isOpen = ['CLARIFICATION_REQUIRED', 'REOPENED'].includes(currentStatus)
   const displayIdx = Math.max(0, effectiveIdx)
@@ -122,7 +111,7 @@ function StatusTimeline({ currentStatus }) {
       </div>
 
       <div className="hidden overflow-x-auto scrollbar-none sm:block">
-      <div className="grid min-w-[920px] grid-cols-[repeat(15,minmax(56px,1fr))] px-1 pt-1">
+      <div className="grid min-w-[520px] grid-cols-[repeat(5,minmax(76px,1fr))] px-1 pt-1">
         {WORKFLOW_STEPS.map((step, idx) => {
           const isCompleted = effectiveIdx > idx && !isRejected
           const isCurrent = step.key === currentStatus || (
@@ -191,6 +180,7 @@ function RequestDetails() {
 
   const [adminComment, setAdminComment] = useState('')
   const [assignedManagerId, setAssignedManagerId] = useState('')
+  const [requirementType, setRequirementType] = useState('MAINTENANCE')
 
   const [diagnosis, setDiagnosis] = useState('')
   const [recommendation, setRecommendation] = useState('')
@@ -231,6 +221,12 @@ function RequestDetails() {
   const [payNotes, setPayNotes] = useState('')
 
   const [confirmModal, setConfirmModal] = useState({ open: false })
+  const [evidenceName, setEvidenceName] = useState('')
+  const [evidenceUrl, setEvidenceUrl] = useState('')
+  const [evidenceKind, setEvidenceKind] = useState('ISSUE_PHOTO')
+  const [evidenceNote, setEvidenceNote] = useState('')
+  const [evidenceFile, setEvidenceFile] = useState(null)
+  const [previewPhoto, setPreviewPhoto] = useState(null)
 
   const fetchRequestDetails = async () => {
     try {
@@ -266,7 +262,7 @@ function RequestDetails() {
         if (res.success) setManagers(res.users)
       })
     }
-    if (auth?.role === 'manager') {
+    if (['manager', 'admin', 'super_admin'].includes(auth?.role)) {
       apiClient.get('/api/users?role=technician').then(res => {
         if (res.success) setTechnicians(res.users)
       })
@@ -323,6 +319,43 @@ function RequestDetails() {
     window.open(`${origin}/api/generate-pdf?type=${type}&id=${id}`, '_blank')
   }
 
+  const addEvidence = async () => {
+    if (!evidenceName.trim() || !evidenceUrl.trim()) {
+      showError('Evidence required', 'Upload a photo or add a valid document link')
+      return
+    }
+    await handleWorkflowAction(`/api/requests?action=add-evidence&id=${id}`, {
+      name: evidenceName.trim(), url: evidenceUrl.trim(), kind: evidenceKind, note: evidenceNote.trim()
+    })
+    setEvidenceName('')
+    setEvidenceUrl('')
+    setEvidenceNote('')
+    setEvidenceFile(null)
+  }
+
+  const selectEvidencePhoto = (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      showError('Unsupported photo', 'Choose a JPG, PNG, or WebP image.')
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      showError('Photo is too large', 'Choose an image that is 2 MB or smaller.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      setEvidenceFile({ name: file.name, preview: reader.result })
+      setEvidenceName(file.name)
+      setEvidenceUrl(reader.result)
+      setEvidenceKind('ISSUE_PHOTO')
+    }
+    reader.onerror = () => showError('Photo upload failed', 'This image could not be read. Please try another file.')
+    reader.readAsDataURL(file)
+  }
+
   const addQuoItem = () => setQuoItems([...quoItems, { description: '', quantity: 1, unit: 'pcs', unitPrice: 0, taxRate: 18, discount: 0, itemType: 'MATERIAL' }])
   const removeQuoItem = (i) => setQuoItems(quoItems.filter((_, idx) => idx !== i))
   const handleQuoItemChange = (i, field, val) => { const n = [...quoItems]; n[i][field] = val; setQuoItems(n) }
@@ -336,6 +369,41 @@ function RequestDetails() {
     if (tab === 'Invoice' && ['SERVICE_VERIFIED', 'INVOICE_SUBMITTED', 'INVOICE_REVISION_REQUIRED'].includes(request.status)) return true
     if (tab === 'Payments' && ['PAYMENT_PENDING', 'PARTIALLY_PAID'].includes(request.status)) return true
     return false
+  }
+
+  const nextAction = getWorkflowGuidance(request?.status, auth?.role)
+  const visibleTabs = TABS
+
+  const isRequestOwner = request && String(request.requesterId) === String(auth?.id)
+  const canManageRequest = isRequestOwner
+  const submittedAt = request?.submittedAt || request?.createdAt
+  const canEditRequest = canManageRequest && (
+    ['DRAFT', 'CLARIFICATION_REQUIRED'].includes(request?.status) ||
+    (request?.status === 'SUBMITTED' && submittedAt && Date.now() - new Date(submittedAt).getTime() <= 24 * 60 * 60 * 1000)
+  )
+
+  const deleteRequest = () => {
+    setConfirmModal({
+      open: true,
+      title: 'Delete request permanently?',
+      message: `This will permanently delete ${request.requestNumber} and its history. This action cannot be undone.`,
+      onCancel: () => setConfirmModal({ open: false }),
+      onConfirm: async () => {
+        setActionLoading(true)
+        try {
+          const res = await apiClient.del(`/api/requests?id=${id}`)
+          if (res?.success) {
+            showSuccess('Request deleted', 'The request was removed successfully.')
+            navigate('/requests', { replace: true })
+          }
+        } catch (err) {
+          showError('Delete failed', err.message || 'Could not delete this request')
+        } finally {
+          setActionLoading(false)
+          setConfirmModal({ open: false })
+        }
+      }
+    })
   }
 
   if (isLoading || !request) {
@@ -358,13 +426,54 @@ function RequestDetails() {
         <button onClick={() => navigate('/requests')} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-all font-semibold">
           <ArrowLeft size={16} /> Back to Requests
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {canEditRequest && (
+            <button type="button" onClick={() => navigate(`/requests/${id}/edit`)} className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700 hover:bg-violet-100">
+              <Pencil size={13} /> Edit
+            </button>
+          )}
+          {canManageRequest && (
+            <button type="button" onClick={deleteRequest} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100">
+              <Trash2 size={13} /> Delete
+            </button>
+          )}
           <span className={`status-badge status-${request.status.toLowerCase()}`}>{request.status.replace(/_/g, ' ')}</span>
         </div>
       </div>
 
       {/* Status Timeline */}
       <StatusTimeline currentStatus={request.status} />
+
+      {/* Role-aware handoff */}
+      <section className={`rounded-2xl border p-4 shadow-sm sm:p-5 ${
+        nextAction.isMyTurn
+          ? 'border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50'
+          : 'border-slate-200 bg-white'
+      }`} aria-labelledby="next-action-title">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className={`mt-0.5 rounded-xl p-2.5 ${nextAction.isMyTurn ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+              {request.status === 'CLOSED' ? <CheckCircle2 size={18} /> : nextAction.isMyTurn ? <AlertCircle size={18} /> : <Clock size={18} />}
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-400">
+                {nextAction.isMyTurn ? 'Your next action' : nextAction.ownerLabel ? `Waiting for ${nextAction.ownerLabel}` : 'Current outcome'}
+              </p>
+              <h2 id="next-action-title" className="mt-1 text-sm font-extrabold text-slate-900 sm:text-base">{nextAction.title}</h2>
+              <p className="mt-1 text-xs leading-relaxed text-slate-600">{nextAction.description}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab(nextAction.tab)}
+            className={`inline-flex flex-shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all ${
+              nextAction.isMyTurn ? 'bg-violet-600 text-white hover:bg-violet-700' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            Open {nextAction.tab} <ChevronRight size={14} />
+          </button>
+        </div>
+      </section>
 
       {/* Hero Header */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
@@ -388,11 +497,102 @@ function RequestDetails() {
             {request.priority}
           </span>
         </div>
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-bold text-slate-600">
+            <ShieldCheck size={12} /> Owner: {(request.currentOwnerRole || nextAction.ownerLabel || 'Complete').toString().replace(/_/g, ' ')}
+          </span>
+          {request.slaDueAt && (
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold ${request.isEscalated ? 'bg-rose-100 text-rose-700' : 'bg-amber-50 text-amber-700'}`}>
+              <TimerReset size={12} /> {request.isEscalated ? 'SLA overdue' : `Due ${formatDistanceToNow(new Date(request.slaDueAt), { addSuffix: true })}`}
+            </span>
+          )}
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700">
+            <ShieldCheck size={12} /> Official audit trail enabled
+          </span>
+        </div>
       </div>
+
+      {/* Evidence register */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" aria-labelledby="evidence-title">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-violet-500">Official record</p>
+            <h2 id="evidence-title" className="mt-1 text-sm font-extrabold text-slate-900">Evidence & documents</h2>
+            <p className="mt-1 text-xs text-slate-500">Upload issue photos for visual proof, or attach secure links for documents and receipts.</p>
+          </div>
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{request.evidence?.length || 0} attached</span>
+        </div>
+
+        {request.evidence?.length > 0 ? (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {request.evidence.map((item, index) => {
+              const isPhoto = ['ISSUE_PHOTO', 'WORK_PHOTO'].includes(item.kind) || item.url?.startsWith('data:image/')
+              return isPhoto ? (
+                <button key={item._id || `${item.url}-${index}`} type="button" onClick={() => setPreviewPhoto(item)} className="interactive-surface group overflow-hidden rounded-xl bg-white text-left hover:-translate-y-0.5">
+                  <div className="relative aspect-video overflow-hidden bg-slate-100">
+                    <img src={item.url} alt={item.name || 'Request evidence'} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                    <span className="absolute inset-0 flex items-center justify-center bg-slate-950/0 text-white opacity-0 transition-all group-hover:bg-slate-950/35 group-hover:opacity-100"><Eye size={24} /></span>
+                    <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-1 text-[9px] font-extrabold uppercase tracking-wide text-violet-700 shadow-sm">{(item.kind || 'PHOTO').replace(/_/g, ' ')}</span>
+                  </div>
+                  <div className="p-3">
+                    <p className="truncate text-xs font-bold text-slate-800">{item.name}</p>
+                    <p className="mt-1 truncate text-[10px] text-slate-400">{item.uploadedBy || 'College user'}{item.note ? ` · ${item.note}` : ''}</p>
+                  </div>
+                </button>
+              ) : (
+                <a key={item._id || `${item.url}-${index}`} href={item.url} target="_blank" rel="noreferrer" className="interactive-surface group flex min-w-0 items-start gap-3 rounded-xl p-3">
+                  <div className="rounded-lg bg-violet-100 p-2 text-violet-700"><Paperclip size={14} /></div>
+                  <div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-800">{item.name}</p><p className="mt-0.5 text-[10px] font-semibold text-violet-600">{(item.kind || 'OTHER').replace(/_/g, ' ')}</p><p className="mt-1 truncate text-[10px] text-slate-400">{item.uploadedBy || 'College user'}{item.note ? ` · ${item.note}` : ''}</p></div>
+                  <ExternalLink size={13} className="mt-1 text-slate-400 group-hover:text-violet-600" />
+                </a>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="mt-4 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/70 px-4 py-7 text-center">
+            <ImagePlus size={26} className="text-slate-300" />
+            <p className="mt-2 text-xs font-bold text-slate-600">No evidence attached yet</p>
+            <p className="mt-1 text-[11px] text-slate-400">Upload a clear issue photo below to help the maintenance team.</p>
+          </div>
+        )}
+
+        {!['CLOSED', 'CANCELLED'].includes(request.status) && auth?.role !== 'admin' && (
+          <div className="mt-4 grid gap-3 rounded-xl border border-violet-100 bg-violet-50/40 p-3 sm:grid-cols-2 lg:grid-cols-5">
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-violet-200 bg-white px-4 py-4 text-xs font-bold text-violet-700 transition-all hover:border-violet-400 hover:bg-violet-50 sm:col-span-2 lg:col-span-5">
+              <ImagePlus size={18} /> {evidenceFile ? 'Choose a different photo' : 'Upload issue photo'}
+              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={selectEvidencePhoto} className="sr-only" />
+            </label>
+            {evidenceFile && (
+              <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-2 sm:col-span-2 lg:col-span-5">
+                <img src={evidenceFile.preview} alt="Selected evidence" className="h-14 w-20 rounded-lg object-cover" />
+                <div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-700">{evidenceFile.name}</p><p className="mt-0.5 text-[10px] text-emerald-700">Ready to attach · maximum 2 MB</p></div>
+                <button type="button" onClick={() => { setEvidenceFile(null); setEvidenceName(''); setEvidenceUrl('') }} aria-label="Remove selected photo" className="rounded-lg p-2 text-slate-500 hover:bg-white hover:text-rose-600"><X size={16} /></button>
+              </div>
+            )}
+            <input aria-label="Evidence name" value={evidenceName} onChange={e => setEvidenceName(e.target.value)} placeholder="Document name" className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs outline-none focus:border-violet-500" />
+            <input aria-label="Evidence link" type="url" value={evidenceFile ? '' : evidenceUrl} disabled={Boolean(evidenceFile)} onChange={e => setEvidenceUrl(e.target.value)} placeholder={evidenceFile ? 'Photo selected above' : 'Or paste a secure document link'} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs outline-none focus:border-violet-500 disabled:bg-slate-100 lg:col-span-2" />
+            <select aria-label="Evidence type" value={evidenceKind} onChange={e => setEvidenceKind(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs outline-none focus:border-violet-500">
+              <option value="ISSUE_PHOTO">Issue photo</option><option value="WORK_PHOTO">Work photo</option><option value="INVOICE">Invoice</option><option value="RECEIPT">Receipt</option><option value="OTHER">Other</option>
+            </select>
+            <button type="button" onClick={addEvidence} disabled={actionLoading} className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-3 py-2.5 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-50"><Paperclip size={13} /> {actionLoading ? 'Attaching...' : 'Attach evidence'}</button>
+            <input aria-label="Evidence note" value={evidenceNote} onChange={e => setEvidenceNote(e.target.value)} placeholder="Optional note" className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs outline-none focus:border-violet-500 sm:col-span-2 lg:col-span-5" />
+          </div>
+        )}
+      </section>
+
+      {previewPhoto && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm" onClick={() => setPreviewPhoto(null)}>
+          <div className="relative max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={event => event.stopPropagation()}>
+            <button type="button" onClick={() => setPreviewPhoto(null)} aria-label="Close photo preview" className="absolute right-3 top-3 z-10 rounded-full bg-slate-950/70 p-2 text-white hover:bg-slate-950"><X size={20} /></button>
+            <img src={previewPhoto.url} alt={previewPhoto.name || 'Evidence preview'} className="max-h-[78vh] w-full bg-slate-950 object-contain" />
+            <div className="p-4 sm:p-5"><p className="text-sm font-extrabold text-slate-900">{previewPhoto.name}</p><p className="mt-1 text-xs text-slate-500">{(previewPhoto.kind || 'PHOTO').replace(/_/g, ' ')} · {previewPhoto.uploadedBy || 'College user'}{previewPhoto.note ? ` · ${previewPhoto.note}` : ''}</p></div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="request-detail-tabs mobile-edge-scroll flex snap-x snap-mandatory gap-2 overflow-x-auto border-b border-slate-200 pb-1 scrollbar-none sm:gap-1">
-        {TABS.map(tab => (
+        {visibleTabs.map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className={`request-detail-tab relative flex-shrink-0 snap-start whitespace-nowrap border-b-2 px-4 py-3 text-sm font-semibold transition-all sm:-mb-px sm:px-5 ${
               activeTab === tab ? 'border-violet-600 text-violet-600 bg-violet-50/50' : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -413,12 +613,31 @@ function RequestDetails() {
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-3 text-left">
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Description</h3>
                 <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{request.description}</p>
+                {request.requestedItem && (
+                  <div className="mt-4 rounded-xl border border-violet-100 bg-violet-50/50 p-4">
+                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-violet-500">Item / service required</p>
+                    <p className="mt-1 text-sm font-bold text-slate-800">{request.requestedItem}</p>
+                    <p className="mt-1 text-xs text-slate-500">Quantity: <span className="font-bold text-slate-700">{request.requestedQuantity} {request.requestedUnit || 'pcs'}</span></p>
+                  </div>
+                )}
                 {request.emergencyReason && (
                   <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs mt-4">
                     <strong>Emergency Reason:</strong> {request.emergencyReason}
                   </div>
                 )}
               </div>
+
+              {auth?.role === 'manager' && request.status === 'ASSIGNED_TO_MANAGER' && String(request.assignedManagerId) === String(auth?.id) && (
+                <div className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-5 text-left shadow-sm sm:p-6">
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-violet-500">Manager action</p>
+                  <h3 className="mt-1 text-base font-extrabold text-slate-900">Generate Purchase Order</h3>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-600">The admin classified this request as <strong>{request.adminAssessment?.requirementType?.replace(/_/g, ' ') || 'a service requirement'}</strong>. Create the PO using the requested item and quantity.</p>
+                  {request.adminAssessment?.note && <p className="mt-3 rounded-lg bg-white p-3 text-xs text-slate-600"><strong>Admin note:</strong> {request.adminAssessment.note}</p>}
+                  <button type="button" onClick={() => navigate(`/purchase-orders?requestId=${id}`)} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-violet-700">
+                    <FileCheck size={16} /> Create Purchase Order <ChevronRight size={15} />
+                  </button>
+                </div>
+              )}
 
               {/* Requester Verification */}
               {auth?.role === 'requester' && request.status === 'TECHNICIAN_COMPLETED' && (
@@ -448,41 +667,47 @@ function RequestDetails() {
                 </div>
               )}
 
-              {/* Admin Review */}
-              {auth?.role === 'admin' && request.status === 'SUBMITTED' && (
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 text-left">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Admin Review</h3>
-                  <textarea rows={2} placeholder="Review notes..." value={adminComment} onChange={e => setAdminComment(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none resize-none" />
-                  <div className="flex flex-wrap gap-2">
-                    <ActionButton variant="success" onClick={() => handleWorkflowAction(`/api/requests?action=approve&id=${id}`, { comment: adminComment }, 'Approve this request?')} loading={actionLoading}>
-                      Approve
-                    </ActionButton>
-                    <ActionButton variant="primary" onClick={() => handleWorkflowAction(`/api/requests?action=clarify&id=${id}`, { comment: adminComment })} loading={actionLoading}>
-                      Request Clarification
-                    </ActionButton>
-                    <ActionButton variant="danger" onClick={() => handleWorkflowAction(`/api/requests?action=reject&id=${id}`, { comment: adminComment }, 'Reject this request?')} loading={actionLoading}>
-                      Reject
-                    </ActionButton>
+              {/* Admin triage: classify the need and assign a manager */}
+              {['admin', 'super_admin'].includes(auth?.role) && request.status === 'SUBMITTED' && (
+                <div className="space-y-5 rounded-xl border border-violet-200 bg-white p-5 text-left shadow-sm sm:p-6">
+                  <div>
+                    <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-violet-500">Admin triage</p>
+                    <h3 className="mt-1 text-base font-extrabold text-slate-900">Verify the requirement and assign a manager</h3>
+                    <p className="mt-1 text-xs text-slate-500">Review the request details and evidence, then identify how the requirement should be handled.</p>
                   </div>
-                </div>
-              )}
-
-              {/* Admin Manager Assignment */}
-              {auth?.role === 'admin' && request.status === 'APPROVED' && (
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 text-left">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Assign Manager</h3>
-                  <select value={assignedManagerId} onChange={e => setAssignedManagerId(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none max-w-xs">
-                    <option value="">Select Manager...</option>
-                    {managers.map(m => <option key={m._id} value={m._id}>{m.name} ({m.department})</option>)}
-                  </select>
-                  <ActionButton onClick={() => handleWorkflowAction(`/api/requests?action=assign-manager&id=${id}`, { managerId: assignedManagerId }, 'Dispatch to this manager?')} disabled={!assignedManagerId} loading={actionLoading}>
-                    Dispatch to Manager
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    {[
+                      ['MAINTENANCE', 'Maintenance', 'Repair or service the existing asset'],
+                      ['REPLACEMENT', 'Replacement', 'Replace a damaged or unusable asset'],
+                      ['NEW_PURCHASE', 'New purchase', 'Procure a new item or facility'],
+                    ].map(([value, label, description]) => (
+                      <button key={value} type="button" onClick={() => setRequirementType(value)} className={`rounded-xl border p-4 text-left transition-all ${requirementType === value ? 'border-violet-500 bg-violet-50 ring-1 ring-violet-500' : 'border-slate-200 bg-white hover:border-violet-300'}`}>
+                        <span className="block text-sm font-extrabold text-slate-800">{label}</span>
+                        <span className="mt-1 block text-[11px] leading-relaxed text-slate-500">{description}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">Assign manager <span className="text-rose-500">*</span></label>
+                      <select value={assignedManagerId} onChange={e => setAssignedManagerId(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500">
+                        <option value="">Select an active manager</option>
+                        {managers.map(m => <option key={m._id} value={m._id}>{m.name} ({m.department})</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">Assessment note <span className="font-medium normal-case tracking-normal text-slate-400">(optional)</span></label>
+                      <textarea rows={2} placeholder="Add useful context for the manager..." value={adminComment} onChange={e => setAdminComment(e.target.value)} className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
+                    </div>
+                  </div>
+                  <ActionButton onClick={() => handleWorkflowAction(`/api/requests?action=triage&id=${id}`, { requirementType, managerId: assignedManagerId, note: adminComment }, 'Confirm classification and assign this manager?')} disabled={!assignedManagerId} loading={actionLoading} className="w-full sm:w-auto">
+                    Verify & Assign Manager
                   </ActionButton>
                 </div>
               )}
 
               {/* Reopened */}
-              {auth?.role === 'admin' && request.status === 'REOPENED' && (
+              {auth?.role === 'super_admin' && request.status === 'REOPENED' && (
                 <div className="bg-white p-6 rounded-xl border border-rose-200 shadow-sm space-y-4 text-left">
                   <h3 className="text-sm font-bold text-rose-700 uppercase tracking-wider flex items-center gap-2">
                     <AlertCircle size={16} /> Request Reopened
@@ -520,6 +745,8 @@ function RequestDetails() {
                 {[
                   ['Category', request.category],
                   ['Asset Code', request.assetCode || 'N/A'],
+                  ['Required Qty', request.requestedItem ? `${request.requestedQuantity} ${request.requestedUnit || 'pcs'}` : 'N/A'],
+                  ['Requirement', request.adminAssessment?.requirementType ? request.adminAssessment.requirementType.replace(/_/g, ' ') : 'Pending triage'],
                   ['Created', new Date(request.createdAt).toLocaleDateString()],
                   ['Manager', request.assignedManagerName || 'Unassigned'],
                 ].map(([label, value]) => (
@@ -591,7 +818,7 @@ function RequestDetails() {
         {/* QUOTATION */}
         {activeTab === 'Quotation' && (
           <div className="space-y-6">
-            {auth?.role === 'admin' && request.status === 'QUOTATION_SUBMITTED' && (
+            {auth?.role === 'super_admin' && request.status === 'QUOTATION_SUBMITTED' && (
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 text-left">
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Budget Approval</h3>
                 <textarea rows={2} placeholder="Approval notes..." value={adminComment} onChange={e => setAdminComment(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none resize-none" />
@@ -740,6 +967,20 @@ function RequestDetails() {
                   </div>
                 </div>
 
+                {['manager', 'admin', 'super_admin'].includes(auth?.role) && request.status === 'WORK_DECLINED' && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-amber-800">Assignment declined</h4>
+                    <p className="mt-1 text-xs text-amber-700">{request.workOrder.declineReason || 'No reason recorded.'}</p>
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                      <select aria-label="Replacement technician" value={selectedTechId} onChange={e => setSelectedTechId(e.target.value)} className="flex-1 rounded-lg border border-amber-200 bg-white p-2.5 text-xs outline-none focus:border-violet-500">
+                        <option value="">Select replacement technician</option>
+                        {technicians.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
+                      </select>
+                      <ActionButton disabled={!selectedTechId} onClick={() => handleWorkflowAction(`/api/work-orders?action=reassign&id=${id}`, { technicianId: selectedTechId }, 'Reassign this work order?')} loading={actionLoading}>Reassign Work</ActionButton>
+                    </div>
+                  </div>
+                )}
+
                 {/* Additional Costs */}
                 {request.workOrder.additionalCosts?.length > 0 && (
                   <div className="pt-4 border-t border-slate-100">
@@ -851,7 +1092,7 @@ function RequestDetails() {
         {/* INVOICE */}
         {activeTab === 'Invoice' && (
           <div className="space-y-6">
-            {auth?.role === 'admin' && request.status === 'INVOICE_SUBMITTED' && (
+            {auth?.role === 'super_admin' && request.status === 'INVOICE_SUBMITTED' && (
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 text-left">
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Invoice Review</h3>
                 <textarea rows={2} placeholder="Notes..." value={adminComment} onChange={e => setAdminComment(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg p-2.5 text-sm focus:outline-none resize-none" />
@@ -924,7 +1165,7 @@ function RequestDetails() {
         {/* PAYMENTS */}
         {activeTab === 'Payments' && (
           <div className="space-y-6">
-            {(auth?.role === 'accounts' || auth?.role === 'admin') && ['PAYMENT_PENDING', 'PARTIALLY_PAID'].includes(request.status) && request.invoice?.status === 'APPROVED' && (
+            {(auth?.role === 'accounts' || auth?.role === 'super_admin') && ['PAYMENT_PENDING', 'PARTIALLY_PAID'].includes(request.status) && request.invoice?.status === 'APPROVED' && (
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 text-left">
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Record Payment</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

@@ -47,7 +47,6 @@ const ReceivingDashboard = lazy(() => import('./pages/ReceivingDashboard'))
 const ReceivingDamaged = lazy(() => import('./pages/ReceivingDamaged'))
 const AccountsDashboard = lazy(() => import('./pages/AccountsDashboard'))
 const AccountsPayments = lazy(() => import('./pages/AccountsPayments'))
-const ManagerQuotations = lazy(() => import('./pages/ManagerQuotations'))
 const ManagerDeliveryPersons = lazy(() => import('./pages/ManagerDeliveryPersons'))
 const ManagerVehicles = lazy(() => import('./pages/ManagerVehicles'))
 
@@ -201,6 +200,7 @@ function AppContent() {
                   {/* Requester / Shared routes */}
                   <Route path="/requests" element={<ProtectedRoute><Requests /></ProtectedRoute>} />
                   <Route path="/requests/new" element={<ProtectedRoute allowedRoles={['requester', 'admin', 'super_admin', 'hod', 'staff']}><CreateRequest /></ProtectedRoute>} />
+                  <Route path="/requests/:id/edit" element={<ProtectedRoute allowedRoles={['requester', 'admin', 'super_admin', 'hod', 'staff']}><CreateRequest /></ProtectedRoute>} />
                   <Route path="/requests/:id" element={<ProtectedRoute><RequestDetails /></ProtectedRoute>} />
                   
                   {/* Reports */}
@@ -244,7 +244,6 @@ function AppContent() {
                   <Route path="/accounts/payments" element={<ProtectedRoute allowedRoles={['admin', 'super_admin', 'accounts']}><AccountsPayments /></ProtectedRoute>} />
                   
                   {/* Manager routes */}
-                  <Route path="/manager/quotations" element={<ProtectedRoute allowedRoles={['admin', 'super_admin', 'manager']}><ManagerQuotations /></ProtectedRoute>} />
                   <Route path="/manager/delivery-persons" element={<ProtectedRoute allowedRoles={['admin', 'super_admin', 'manager']}><ManagerDeliveryPersons /></ProtectedRoute>} />
                   <Route path="/manager/vehicles" element={<ProtectedRoute allowedRoles={['admin', 'super_admin', 'manager']}><ManagerVehicles /></ProtectedRoute>} />
                   

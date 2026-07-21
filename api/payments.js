@@ -1,5 +1,6 @@
 import { connectToDatabase } from '../lib/mongo.js'
 import { ServiceRequest, User } from '../models.js'
+import { finalizeRequestWorkflow } from '../lib/workflowEngine.js'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
@@ -24,7 +25,7 @@ export default async function handler(req, res) {
       const request = await ServiceRequest.findById(id)
       if (!request) return res.status(404).json({ success: false, error: 'Request not found' })
       if (!request.invoice) return res.status(400).json({ success: false, error: 'Invoice must be created and approved before recording payment' })
-      if (!['accounts', 'admin', 'super_admin'].includes(actorRole)) return res.status(403).json({ success: false, error: 'Only accounts or an administrator can record payments' })
+      if (!['accounts', 'super_admin'].includes(actorRole)) return res.status(403).json({ success: false, error: 'Only accounts or a super administrator can record payments' })
       if (request.invoice.status !== 'APPROVED' || !['PAYMENT_PENDING', 'PARTIALLY_PAID'].includes(request.status)) return res.status(409).json({ success: false, error: 'Payments can only be recorded against an approved, outstanding invoice' })
 
       const { amount, method, referenceNumber, notes } = req.body
@@ -73,6 +74,7 @@ export default async function handler(req, res) {
         comment: `Recorded payment: ₹${paymentAmt.toFixed(2)} via ${method}. Outstanding balance: ₹${request.invoice.balanceDue.toFixed(2)}. Status: ${request.status}`
       })
 
+      await finalizeRequestWorkflow(request, { id: actorId, name: actorName, role: actorRole })
       await request.save()
       return res.status(200).json({ success: true, data: request })
     }

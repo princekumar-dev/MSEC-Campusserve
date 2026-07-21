@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAlert } from '../components/AlertContext'
 import ModalShell from '../components/ModalShell'
 import apiClient from '../utils/apiClient'
@@ -22,10 +22,10 @@ const statusConfig = {
   CANCELLED: { label: 'Cancelled', color: 'bg-slate-100 text-slate-400 border-slate-200' },
 }
 
-function CreatePOModal({ onClose, onSaved }) {
+function CreatePOModal({ onClose, onSaved, sourceRequest }) {
   const [vendors, setVendors] = useState([])
-  const [form, setForm] = useState({ vendorId: '', deliveryAddress: 'MSEC Campus, Aravayal, Chennai - 600089', deliveryLocation: '', expectedDeliveryDate: '', paymentTerms: 'Net 30', notes: '', deliveryCharge: 0 })
-  const [items, setItems] = useState([{ description: '', specification: '', brand: '', quantityOrdered: 1, unit: 'pcs', unitPrice: 0, taxRate: 18, discount: 0 }])
+  const [form, setForm] = useState({ vendorId: '', deliveryAddress: 'MSEC Campus, Aravayal, Chennai - 600089', deliveryLocation: sourceRequest?.location || '', expectedDeliveryDate: '', paymentTerms: 'Net 30', notes: sourceRequest ? `Generated for ${sourceRequest.requestNumber}: ${sourceRequest.title}` : '', deliveryCharge: 0 })
+  const [items, setItems] = useState([{ description: sourceRequest?.requestedItem || '', specification: sourceRequest?.description || '', brand: '', quantityOrdered: sourceRequest?.requestedQuantity || 1, unit: sourceRequest?.requestedUnit || 'pcs', unitPrice: 0, priceMode: 'UNIT', taxRate: 18, discount: 0 }])
   const [loading, setLoading] = useState(false)
   const { showSuccess, showError } = useAlert()
 
@@ -33,14 +33,31 @@ function CreatePOModal({ onClose, onSaved }) {
     apiClient.get('/api/vendors?status=ACTIVE').then(r => { if (r.success) setVendors(r.data) })
   }, [])
 
-  const addItem = () => setItems(p => [...p, { description: '', specification: '', brand: '', quantityOrdered: 1, unit: 'pcs', unitPrice: 0, taxRate: 18, discount: 0 }])
+  const addItem = () => setItems(p => [...p, { description: '', specification: '', brand: '', quantityOrdered: 1, unit: 'pcs', unitPrice: 0, priceMode: 'UNIT', taxRate: 18, discount: 0 }])
   const removeItem = idx => setItems(p => p.filter((_, i) => i !== idx))
   const updateItem = (idx, field, val) => setItems(p => p.map((item, i) => i === idx ? { ...item, [field]: val } : item))
+
+  const getLineValues = (item) => {
+    const quantity = Math.max(1, Number(item.quantityOrdered) || 1)
+    const enteredPrice = Math.max(0, Number(item.unitPrice) || 0)
+    const unitPrice = item.priceMode === 'TOTAL' ? enteredPrice / quantity : enteredPrice
+    const subtotal = unitPrice * quantity
+    const discount = Math.max(0, Number(item.discount) || 0)
+    const tax = Math.max(0, subtotal - discount) * (Number(item.taxRate || 0) / 100)
+    return { unitPrice, subtotal, tax, total: subtotal - discount + tax }
+  }
+
+  const changePriceMode = (idx, nextMode) => setItems(current => current.map((item, index) => {
+    if (index !== idx || item.priceMode === nextMode) return item
+    const quantity = Math.max(1, Number(item.quantityOrdered) || 1)
+    const currentPrice = Number(item.unitPrice) || 0
+    return { ...item, priceMode: nextMode, unitPrice: nextMode === 'TOTAL' ? currentPrice * quantity : currentPrice / quantity }
+  }))
 
   const calcTotal = () => {
     let sub = 0, tax = 0, disc = 0
     items.forEach(item => {
-      const lineSub = Number(item.quantityOrdered) * Number(item.unitPrice)
+      const lineSub = getLineValues(item).subtotal
       const lineDisc = Number(item.discount || 0)
       const lineTax = (lineSub - lineDisc) * (Number(item.taxRate) / 100)
       sub += lineSub; disc += lineDisc; tax += lineTax
@@ -54,9 +71,15 @@ function CreatePOModal({ onClose, onSaved }) {
     if (!form.vendorId || !items.some(i => i.description)) return showError('Missing Info', 'Select vendor and add at least one item')
     setLoading(true)
     try {
-      const res = await apiClient.post('/api/purchase-orders', { ...form, items })
-      if (res.success) { showSuccess('PO Created', `${res.data.poNumber} created as draft`); onSaved() }
+      const normalizedItems = items.map(item => ({ ...item, unitPrice: getLineValues(item).unitPrice }))
+      const res = await apiClient.post('/api/purchase-orders', { ...form, requestId: sourceRequest?._id, items: normalizedItems })
+      if (res.success) {
+        showSuccess(res.existing ? 'PO Already Created' : 'PO Created', res.existing ? `${res.data.poNumber} opened for this request` : `${res.data.poNumber} created as draft`)
+        onSaved(res.data)
+      }
       else showError('Error', res.error)
+    } catch (err) {
+      showError('Unable to Create PO', err.message || 'Please try again.')
     } finally { setLoading(false) }
   }
 
@@ -86,25 +109,38 @@ function CreatePOModal({ onClose, onSaved }) {
             </div>
             <div className="space-y-3">
               {items.map((item, idx) => (
-                <div key={idx} className="grid grid-cols-1 sm:grid-cols-6 gap-2 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                <div key={idx} className="grid grid-cols-1 gap-3 rounded-xl border border-slate-100 bg-slate-50 p-4 sm:grid-cols-12">
                   <div className="sm:col-span-2">
                     <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Description *</label>
                     <input type="text" value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)} placeholder="Item name..." className="w-full mt-1 bg-white border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:border-violet-500" />
                   </div>
-                  <div>
+                  <div className="sm:col-span-2">
                     <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Qty *</label>
                     <input type="number" value={item.quantityOrdered} onChange={e => updateItem(idx, 'quantityOrdered', e.target.value)} min="1" className="w-full mt-1 bg-white border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:border-violet-500" />
                   </div>
-                  <div>
+                  <div className="sm:col-span-2">
                     <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Unit</label>
                     <input type="text" value={item.unit} onChange={e => updateItem(idx, 'unit', e.target.value)} placeholder="pcs" className="w-full mt-1 bg-white border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:border-violet-500" />
                   </div>
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Price (₹) *</label>
-                    <input type="number" value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', e.target.value)} min="0" className="w-full mt-1 bg-white border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:border-violet-500" />
+                  <div className="sm:col-span-2">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Price entry *</label>
+                    <select value={item.priceMode || 'UNIT'} onChange={e => changePriceMode(idx, e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 text-xs outline-none focus:border-violet-500">
+                      <option value="UNIT">Per item</option>
+                      <option value="TOTAL">Full quantity</option>
+                    </select>
                   </div>
-                  <div className="flex items-end">
+                  <div className="sm:col-span-2">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{item.priceMode === 'TOTAL' ? 'Total price (₹)' : 'Unit price (₹)'} *</label>
+                    <input type="number" value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', e.target.value)} min="0" step="0.01" className="mt-1 w-full rounded-lg border border-violet-200 bg-white p-2 text-xs font-semibold outline-none focus:border-violet-500" />
+                  </div>
+                  <div className="flex items-end sm:col-span-2">
                     {items.length > 1 && <button type="button" onClick={() => removeItem(idx)} className="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold rounded-lg border border-rose-200 transition-all mt-1">Remove</button>}
+                  </div>
+                  <div className="rounded-lg border border-violet-100 bg-white px-3 py-2 sm:col-span-12">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <span className="text-slate-500">{item.quantityOrdered || 1} × ₹{getLineValues(item).unitPrice.toFixed(2)} per {item.unit || 'unit'}</span>
+                      <span className="font-extrabold text-violet-700">Line subtotal: ₹{getLineValues(item).subtotal.toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -149,8 +185,21 @@ export default function PurchaseOrders() {
   const { showSuccess, showError } = useAlert()
   const auth = getAuthOrNull()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const requestId = searchParams.get('requestId')
+  const [sourceRequest, setSourceRequest] = useState(null)
 
-  const canCreate = ['admin', 'super_admin', 'manager'].includes(auth?.role)
+  const canCreate = ['super_admin', 'manager'].includes(auth?.role)
+
+  useEffect(() => {
+    if (!requestId) return
+    apiClient.get(`/api/requests?id=${requestId}`, { cache: false }).then(res => {
+      if (res?.success) {
+        setSourceRequest(res.data)
+        setShowCreate(true)
+      }
+    }).catch(err => showError('Request unavailable', err.message))
+  }, [requestId, showError])
 
   const fetchPOs = useCallback(async () => {
     setIsLoading(true)
@@ -174,7 +223,7 @@ export default function PurchaseOrders() {
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      {showCreate && <CreatePOModal onClose={() => setShowCreate(false)} onSaved={() => { setShowCreate(false); fetchPOs() }} />}
+      {showCreate && <CreatePOModal sourceRequest={sourceRequest} onClose={() => setShowCreate(false)} onSaved={(po) => { setShowCreate(false); if (po?._id) navigate(`/purchase-orders/${po._id}`); else fetchPOs() }} />}
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
         <div>
@@ -189,19 +238,23 @@ export default function PurchaseOrders() {
       </div>
 
       {/* Filter Bar */}
-      <div className="space-y-3 p-4 premium-card">
-        <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input type="text" placeholder="Search by PO number or vendor..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-slate-50 border-none rounded-lg py-2 pl-9 pr-4 text-xs focus:bg-white focus:ring-1 focus:ring-violet-500 focus:outline-none transition-all" />
+      <div className="flex flex-col gap-3 p-3 premium-card sm:p-4 xl:flex-row xl:items-center xl:justify-between xl:gap-5">
+        <div className="flex min-w-0 items-center gap-2 overflow-x-auto pb-1 scrollbar-none xl:flex-1 xl:pb-0">
+          {statusGroups.map(s => {
+            const count = s === 'ALL' ? pos.length : pos.filter(p => p.status === s).length
+            const isActive = statusFilter === s
+            return (
+              <button key={s} onClick={() => setStatusFilter(s)} aria-pressed={isActive}
+                className={`group flex h-10 flex-none items-center gap-2 whitespace-nowrap rounded-full border px-3.5 text-[11px] font-extrabold transition-all duration-200 xl:px-4 ${isActive ? 'border-violet-600 bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-md shadow-violet-200/80' : 'border-slate-200/80 bg-white text-slate-600 shadow-sm hover:-translate-y-0.5 hover:border-violet-300 hover:bg-violet-50/70 hover:text-violet-700 hover:shadow-md hover:shadow-violet-100'}`}>
+                <span>{s === 'ALL' ? 'All' : (statusConfig[s]?.label || s)}</span>
+                <span className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-black leading-none transition-colors ${isActive ? 'bg-white/20 text-white ring-1 ring-white/20' : 'bg-slate-100 text-slate-500 group-hover:bg-violet-100 group-hover:text-violet-700'}`}>{count}</span>
+              </button>
+            )
+          })}
         </div>
-        <div className="flex flex-wrap gap-2">
-          {statusGroups.map(s => (
-            <button key={s} onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${statusFilter === s ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-              {s === 'ALL' ? 'All' : (statusConfig[s]?.label || s)}
-              {s !== 'ALL' && <span className="ml-1.5 text-[11px] opacity-70">{pos.filter(p => p.status === s).length}</span>}
-            </button>
-          ))}
+        <div className="relative min-w-0 xl:w-80 xl:flex-none 2xl:w-96">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition-colors pointer-events-none" />
+          <input type="search" aria-label="Search purchase orders" placeholder="Search by PO number or vendor..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="h-11 w-full rounded-full border border-slate-200/80 bg-white py-2 pl-10 pr-4 text-xs text-slate-700 shadow-sm outline-none transition-all placeholder:text-slate-400 hover:border-violet-200 hover:shadow-md hover:shadow-violet-100/60 focus:border-violet-400 focus:ring-4 focus:ring-violet-100" />
         </div>
       </div>
 
@@ -230,7 +283,7 @@ export default function PurchaseOrders() {
               </thead>
               <tbody className="divide-y divide-slate-50 text-sm text-slate-700">
                 {filtered.map(po => (
-                  <tr key={po._id} className="hover:bg-slate-50/50 transition-all group cursor-pointer" onClick={() => navigate(`/purchase-orders/${po._id}`)}>
+                  <tr key={po._id} className="table-row-hover group cursor-pointer" onClick={() => navigate(`/purchase-orders/${po._id}`)}>
                     <td className="px-6 py-4 font-mono text-xs font-bold text-violet-600">{po.poNumber}</td>
                     <td className="px-6 py-4 font-semibold text-slate-800">{po.vendorName}</td>
                     <td className="px-6 py-4 text-slate-500 text-xs">{po.items?.length || 0} items</td>

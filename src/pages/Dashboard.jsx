@@ -152,7 +152,6 @@ function Dashboard() {
     }
     if (auth?.role === 'manager') {
       return [
-        { label: 'Quotations', value: stats.totalQuotations, icon: FileCheck, color: 'indigo', bg: 'bg-indigo-50', textColor: 'text-indigo-600', sub: 'Built' },
         { label: 'Awaiting Invoice', value: stats.pendingInvoicing, icon: IndianRupee, color: 'amber', bg: 'bg-amber-50', textColor: 'text-amber-600', sub: 'Verified services' },
         ...base.slice(1)
       ]
@@ -399,7 +398,7 @@ function Dashboard() {
       case 'super_admin':
         return (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {action('/requests?status=SUBMITTED', AlertCircle, 'bg-amber-50', 'text-amber-600', 'Review Requests', `${stats.pendingAdmin} pending`, 'bg-amber-100 text-amber-700')}
+            {action('/requests?queue=MY_ACTIONS', AlertCircle, 'bg-amber-50', 'text-amber-600', 'My Action Queue', `${stats.pendingAdmin} pending`, 'bg-amber-100 text-amber-700')}
             {action('/admin/users', Users, 'bg-slate-50', 'text-slate-600', 'Manage Users', `${stats.totalUsers || 0} registered`, 'bg-slate-100 text-slate-700')}
             {action('/admin/settings', Settings, 'bg-indigo-50', 'text-indigo-600', 'System Settings')}
             {action('/reports', TrendingUp, 'bg-emerald-50', 'text-emerald-600', 'Reports & Analytics')}
@@ -408,8 +407,7 @@ function Dashboard() {
       case 'manager':
         return (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {action('/requests?status=APPROVED', Wrench, 'bg-violet-50', 'text-violet-600', 'Unassigned Tasks', 'Needs inspection', 'bg-violet-100 text-violet-700')}
-            {action('/manager/quotations', FileCheck, 'bg-indigo-50', 'text-indigo-600', 'Quotations')}
+            {action('/requests?queue=MY_ACTIONS', Wrench, 'bg-violet-50', 'text-violet-600', 'My Action Queue', 'Inspections & estimates', 'bg-violet-100 text-violet-700')}
             {action('/vendors', Building2, 'bg-emerald-50', 'text-emerald-600', 'Vendors')}
             {action('/reports', TrendingUp, 'bg-amber-50', 'text-amber-600', 'Reports')}
           </div>
@@ -417,13 +415,13 @@ function Dashboard() {
       case 'technician':
         return (
           <div className="grid grid-cols-1 gap-4 max-w-md">
-            {action('/requests', Wrench, 'bg-violet-50', 'text-violet-600', 'My Work Orders', `${stats.activeWork} active`, 'bg-violet-100 text-violet-700')}
+            {action('/requests?queue=MY_ACTIONS', Wrench, 'bg-violet-50', 'text-violet-600', 'My Work Orders', `${stats.activeWork} active`, 'bg-violet-100 text-violet-700')}
           </div>
         )
       case 'accounts':
         return (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {action('/accounts/payments', IndianRupee, 'bg-emerald-50', 'text-emerald-600', 'Record Payments', `${stats.pendingPayment} awaiting`, 'bg-emerald-100 text-emerald-700')}
+            {action('/requests?queue=MY_ACTIONS', IndianRupee, 'bg-emerald-50', 'text-emerald-600', 'Payment Queue', `${stats.pendingPayment} awaiting`, 'bg-emerald-100 text-emerald-700')}
             {action('/reports', ClipboardList, 'bg-violet-50', 'text-violet-600', 'Financial Reports')}
           </div>
         )

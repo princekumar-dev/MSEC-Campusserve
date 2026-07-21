@@ -3,7 +3,7 @@ import { useAlert } from '../components/AlertContext'
 import ModalShell from '../components/ModalShell'
 import apiClient from '../utils/apiClient'
 import { getAuthOrNull } from '../utils/auth'
-import { Truck, Plus, Calendar, Clock, QrCode, CheckCircle, AlertCircle, Send, RefreshCw, Package } from 'lucide-react'
+import { Truck, Plus, Calendar, Clock, QrCode, CheckCircle, AlertCircle, Send, RefreshCw, Package, Search } from 'lucide-react'
 
 const statusColors = {
   SCHEDULED: 'bg-blue-50 text-blue-700 border-blue-200',
@@ -40,7 +40,7 @@ function ScheduleDeliveryModal({ onClose, onSaved }) {
     setLoading(true)
     try {
       const res = await apiClient.post('/api/deliveries', form)
-      if (res.success) { showSuccess('Scheduled', `Delivery ${res.data.deliveryNumber} scheduled`); onSaved() }
+      if (res.success) { showSuccess('Scheduled', `Delivery ${res.data.deliveryNumber} scheduled`); onSaved(res.data) }
       else showError('Error', res.error)
     } finally { setLoading(false) }
   }
@@ -119,6 +119,7 @@ export default function Deliveries() {
   const [deliveries, setDeliveries] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('ALL')
+  const [searchQuery, setSearchQuery] = useState('')
   const [showSchedule, setShowSchedule] = useState(false)
   const [generatingPass, setGeneratingPass] = useState(null)
   const { showSuccess, showError } = useAlert()
@@ -142,17 +143,26 @@ export default function Deliveries() {
     setGeneratingPass(deliveryId)
     try {
       const res = await apiClient.post(`/api/deliveries?id=${deliveryId}&action=generate-pass`)
-      if (res.success) { showSuccess('Pass Generated', `QR pass + backup code created for delivery`); fetchDeliveries() }
+      if (res.success) {
+        setDeliveries(current => current.map(delivery => delivery._id === deliveryId ? { ...delivery, ...res.data } : delivery))
+        showSuccess('Pass Generated', 'QR pass + backup code created for delivery')
+      }
       else showError('Error', res.error)
     } finally { setGeneratingPass(null) }
   }
 
-  const filtered = deliveries.filter(d => statusFilter === 'ALL' || d.status === statusFilter)
+  const normalizedSearch = searchQuery.trim().toLowerCase()
+  const filtered = deliveries.filter(d => {
+    const matchesStatus = statusFilter === 'ALL' || d.status === statusFilter
+    const matchesSearch = !normalizedSearch || [d.deliveryNumber, d.poNumber, d.vendorName, d.deliveryLocation, d.vehicleNumber, d.challanNumber]
+      .some(value => String(value || '').toLowerCase().includes(normalizedSearch))
+    return matchesStatus && matchesSearch
+  })
   const statusOptions = ['ALL', 'SCHEDULED', 'PASS_GENERATED', 'ENTRY_APPROVED', 'PARTIALLY_RECEIVED', 'FULLY_RECEIVED', 'ENTRY_REJECTED', 'CANCELLED']
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      {showSchedule && <ScheduleDeliveryModal onClose={() => setShowSchedule(false)} onSaved={() => { setShowSchedule(false); fetchDeliveries() }} />}
+      {showSchedule && <ScheduleDeliveryModal onClose={() => setShowSchedule(false)} onSaved={(delivery) => { setShowSchedule(false); setDeliveries(current => [delivery, ...current]) }} />}
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
         <div>
@@ -166,15 +176,25 @@ export default function Deliveries() {
         )}
       </div>
 
-      {/* Status Filter Pills */}
-      <div className="flex flex-wrap gap-2 p-4 premium-card">
-        {statusOptions.map(s => (
-          <button key={s} onClick={() => setStatusFilter(s)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${statusFilter === s ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-            {s === 'ALL' ? 'All' : s.replace(/_/g, ' ')}
-            {s !== 'ALL' && <span className="ml-1.5 opacity-70">{deliveries.filter(d => d.status === s).length}</span>}
-          </button>
-        ))}
+      {/* Status filters and search */}
+      <div className="flex flex-col gap-3 p-3 premium-card sm:p-4 xl:flex-row xl:items-center xl:justify-between xl:gap-5">
+        <div className="flex min-w-0 items-center gap-2 overflow-x-auto pb-1 scrollbar-none xl:flex-1 xl:pb-0">
+          {statusOptions.map(s => {
+            const count = s === 'ALL' ? deliveries.length : deliveries.filter(d => d.status === s).length
+            const isActive = statusFilter === s
+            return (
+              <button key={s} onClick={() => setStatusFilter(s)} aria-pressed={isActive}
+                className={`group flex h-10 flex-none items-center gap-2 whitespace-nowrap rounded-full border px-3.5 text-[11px] font-extrabold capitalize transition-all duration-200 xl:px-4 ${isActive ? 'border-violet-600 bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-md shadow-violet-200/80' : 'border-slate-200/80 bg-white text-slate-600 shadow-sm hover:-translate-y-0.5 hover:border-violet-300 hover:bg-violet-50/70 hover:text-violet-700 hover:shadow-md hover:shadow-violet-100'}`}>
+                <span>{s === 'ALL' ? 'All' : s.replace(/_/g, ' ').toLowerCase()}</span>
+                <span className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-black leading-none transition-colors ${isActive ? 'bg-white/20 text-white ring-1 ring-white/20' : 'bg-slate-100 text-slate-500 group-hover:bg-violet-100 group-hover:text-violet-700'}`}>{count}</span>
+              </button>
+            )
+          })}
+        </div>
+        <div className="relative min-w-0 xl:w-80 xl:flex-none 2xl:w-96">
+          <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input type="search" aria-label="Search delivery schedules" placeholder="Search delivery, PO, vendor or location..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="h-11 w-full rounded-full border border-slate-200/80 bg-white py-2 pl-10 pr-4 text-xs text-slate-700 shadow-sm outline-none transition-all placeholder:text-slate-400 hover:border-violet-200 hover:shadow-md hover:shadow-violet-100/60 focus:border-violet-400 focus:ring-4 focus:ring-violet-100" />
+        </div>
       </div>
 
       {/* Delivery Cards */}
