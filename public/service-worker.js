@@ -49,6 +49,15 @@ self.addEventListener('activate', (event) => {
 
 // Fetch Event - with error handling
 self.addEventListener('fetch', (event) => {
+  const requestUrl = new URL(event.request.url);
+
+  // Vite development resources (including HMR modules) must go directly to
+  // the dev server. A service worker response here can replace a temporary
+  // network failure with a cached/synthetic response and break the whole app.
+  if (requestUrl.hostname === 'localhost' || requestUrl.hostname === '127.0.0.1') {
+    return;
+  }
+
   // Skip non-GET requests and chrome-extension requests
   if (event.request.method !== 'GET' || event.request.url.startsWith('chrome-extension://')) {
     return;
@@ -91,19 +100,7 @@ self.addEventListener('fetch', (event) => {
         }
         
         // Try to fetch from network
-        return fetch(event.request)
-          .catch((error) => {
-            // Log error but don't throw - let browser handle it
-            console.warn('Service Worker: Fetch failed for', event.request.url, error);
-            // Return a basic response for failed requests to prevent error spam
-            return new Response('Service Worker: Network request failed', {
-              status: 408,
-              statusText: 'Request Timeout',
-              headers: new Headers({
-                'Content-Type': 'text/plain'
-              })
-            });
-          });
+        return fetch(event.request);
       })
   );
 });

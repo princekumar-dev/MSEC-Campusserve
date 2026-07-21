@@ -61,7 +61,7 @@ function CreateGRNModal({ onClose, onSaved }) {
       })
       if (res.success) {
         showSuccess('GRN Created', `${res.data.grnNumber} — ${res.grnType} GRN recorded. PO is now ${res.poStatus?.replace(/_/g, ' ')}`)
-        onSaved()
+        onSaved(res.data)
       } else showError('GRN Error', res.error)
     } finally { setLoading(false) }
   }
@@ -238,7 +238,7 @@ export default function GRN() {
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      {showCreate && <CreateGRNModal onClose={() => setShowCreate(false)} onSaved={() => { setShowCreate(false); fetchGRNs() }} />}
+      {showCreate && <CreateGRNModal onClose={() => setShowCreate(false)} onSaved={(grn) => { setShowCreate(false); setGrns(current => [grn, ...current]) }} />}
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
         <div>

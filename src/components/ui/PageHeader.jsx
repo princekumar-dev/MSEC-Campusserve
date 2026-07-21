@@ -25,7 +25,7 @@ export default function PageHeader({ title, subtitle, role, action, badge }) {
         <h1 className="page-title">{title}</h1>
         {subtitle && <p className="page-subtitle">{subtitle}</p>}
       </div>
-      {action && <div className="flex-shrink-0 mt-2 sm:mt-0">{action}</div>}
+      {action && <div className="page-header-action mt-2 min-w-0 sm:mt-0 sm:flex-shrink-0">{action}</div>}
     </div>
   )
 }

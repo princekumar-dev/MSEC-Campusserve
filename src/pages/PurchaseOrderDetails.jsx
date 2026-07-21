@@ -68,6 +68,7 @@ export default function PurchaseOrderDetails() {
   const [po, setPo] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
   const [comment, setComment] = useState('')
   const [activeTab, setActiveTab] = useState('Overview')
   const { showSuccess, showError } = useAlert()
@@ -98,6 +99,33 @@ export default function PurchaseOrderDetails() {
     finally { setActionLoading(false) }
   }
 
+  const downloadPdf = async () => {
+    if (pdfLoading || !po) return
+    setPdfLoading(true)
+    try {
+      const blob = await apiClient.get(`/api/generate-pdf?type=purchase-order&id=${id}&template=academics-marksheet-v2&t=${Date.now()}`, {
+        cache: false,
+        dedupe: false,
+        responseType: 'blob',
+        timeout: 120000
+      })
+      if (!(blob instanceof Blob) || blob.size === 0) throw new Error('The generated PDF was empty')
+      const objectUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = objectUrl
+      link.download = `${po.poNumber || 'purchase-order'}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
+      showSuccess('PDF Downloaded', `${po.poNumber}.pdf is ready`)
+    } catch (err) {
+      showError('PDF Download Failed', err.message || 'Unable to generate the purchase order PDF')
+    } finally {
+      setPdfLoading(false)
+    }
+  }
+
   if (isLoading) return <div className="flex items-center justify-center min-h-[50vh]"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-violet-500" /></div>
   if (!po) return <div className="text-center py-20 text-slate-400">PO not found</div>
 
@@ -119,6 +147,10 @@ export default function PurchaseOrderDetails() {
           <p className="text-sm text-slate-500">Created by {po.createdBy} · {new Date(po.createdAt).toLocaleDateString('en-IN')}</p>
         </div>
         <div className="flex items-center space-x-3">
+          <button type="button" onClick={downloadPdf} disabled={pdfLoading} className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-xs font-bold text-violet-700 hover:bg-violet-100 disabled:cursor-wait disabled:opacity-60">
+            {pdfLoading ? <RefreshCw size={15} className="animate-spin" /> : <Download size={15} />}
+            {pdfLoading ? 'Preparing PDF...' : 'Download PDF'}
+          </button>
           <div className="text-right">
             <div className="text-xs text-slate-400">Grand Total</div>
             <div className="text-2xl font-black text-violet-700">₹{(po.grandTotal || 0).toFixed(2)}</div>
@@ -131,7 +163,7 @@ export default function PurchaseOrderDetails() {
       <StatusTimeline currentStatus={po.status} />
 
       {/* Workflow Action Cards */}
-      {isManager && po.status === 'DRAFT' && (
+      {false && isManager && po.status === 'DRAFT' && (
         <div className="bg-white p-6 rounded-xl border border-violet-200 shadow-sm space-y-4 text-left">
           <h3 className="text-sm font-bold text-slate-800">Submit for Admin Approval</h3>
           <p className="text-xs text-slate-500">Review the PO details and submit for admin approval when ready.</p>
@@ -141,7 +173,7 @@ export default function PurchaseOrderDetails() {
         </div>
       )}
 
-      {isAdmin && po.status === 'SUBMITTED_FOR_APPROVAL' && (
+      {false && isAdmin && po.status === 'SUBMITTED_FOR_APPROVAL' && (
         <div className="bg-white p-6 rounded-xl border border-amber-200 shadow-sm space-y-4 text-left">
           <h3 className="text-sm font-bold text-amber-700 flex items-center space-x-2"><AlertCircle size={16} /><span>Admin Approval Required</span></h3>
           <textarea rows={2} placeholder="Enter approval decision notes..." value={comment} onChange={e => setComment(e.target.value)} className="w-full bg-slate-50 border-none rounded-lg p-2.5 text-sm focus:outline-none resize-none" />
@@ -153,7 +185,7 @@ export default function PurchaseOrderDetails() {
         </div>
       )}
 
-      {isManager && po.status === 'APPROVED' && (
+      {false && isManager && po.status === 'APPROVED' && (
         <div className="bg-white p-6 rounded-xl border border-blue-200 shadow-sm space-y-4 text-left">
           <h3 className="text-sm font-bold text-blue-700">Send PO to Vendor</h3>
           <p className="text-xs text-slate-500">PO approved. Send to vendor <strong>{po.vendorName}</strong> ({po.vendorEmail}) to proceed with order.</p>

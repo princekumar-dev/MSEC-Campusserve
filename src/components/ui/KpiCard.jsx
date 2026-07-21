@@ -1,6 +1,6 @@
 export default function KpiCard({ label, value, sub, icon: Icon, iconBg, iconColor, centered = false, className = '' }) {
   return (
-    <div className={`premium-kpi p-5 ${centered ? 'text-center' : ''} ${className}`}>
+    <div className={`premium-kpi group p-4 sm:p-5 ${centered ? 'text-center' : ''} ${className}`}>
       {centered ? (
         <>
           {Icon && (
@@ -22,7 +22,7 @@ export default function KpiCard({ label, value, sub, icon: Icon, iconBg, iconCol
               </div>
             )}
           </div>
-          <div className="text-2xl font-black text-slate-800 mt-2 count-up">{value}</div>
+          <div className="count-up mt-2 text-2xl font-black tracking-[-0.04em] text-slate-900 sm:text-3xl">{value}</div>
           {sub && <span className="text-[11px] text-slate-500 mt-1 block">{sub}</span>}
         </>
       )}

@@ -146,8 +146,18 @@ if (typeof window !== 'undefined') {
 }
 
 
-// Auto-register service worker if not already registered (helps ensure SWControls actions work)
-if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+// Service workers should never control the Vite development origin: they can
+// intercept /src modules and /@react-refresh and prevent HMR or app startup.
+if (import.meta.env.DEV && typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations()
+    .then(registrations => Promise.all(registrations.map(registration => registration.unregister())))
+    .then(() => caches?.keys?.())
+    .then(keys => keys && Promise.all(keys.map(key => caches.delete(key))))
+    .catch(error => console.warn('[sw-dev] cleanup failed', error));
+}
+
+// Auto-register the service worker only in production.
+if (import.meta.env.PROD && typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
   (async () => {
     try {
       const existing = await navigator.serviceWorker.getRegistrations();

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import ReactDOM from 'react-dom'
 import { useLocation } from 'react-router-dom'
 
 function GlobalExecutionLoader() {
@@ -77,7 +78,7 @@ function GlobalExecutionLoader() {
 
   if (!isVisible) return null
 
-  return (
+  return ReactDOM.createPortal(
     <>
       <style>{`
         @keyframes violetShimmer {
@@ -176,7 +177,8 @@ function GlobalExecutionLoader() {
           <span>Processing...</span>
         </div>
       )}
-    </>
+    </>,
+    document.body
   )
 }
 

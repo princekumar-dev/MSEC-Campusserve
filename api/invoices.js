@@ -1,5 +1,6 @@
 import { connectToDatabase } from '../lib/mongo.js'
 import { ServiceRequest, User } from '../models.js'
+import { finalizeRequestWorkflow } from '../lib/workflowEngine.js'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
@@ -22,7 +23,7 @@ export default async function handler(req, res) {
     if (req.method === 'POST' && !action && requestId) {
       const request = await ServiceRequest.findById(requestId)
       if (!request) return res.status(404).json({ success: false, error: 'Request not found' })
-      if (!['manager', 'admin', 'super_admin'].includes(actorRole)) return res.status(403).json({ success: false, error: 'Only a manager or administrator can draft an invoice' })
+      if (actorRole !== 'super_admin') return res.status(403).json({ success: false, error: 'Managers generate purchase orders directly for assigned requests' })
       if (!['SERVICE_VERIFIED', 'INVOICE_REVISION_REQUIRED'].includes(request.status)) return res.status(409).json({ success: false, error: 'An invoice can only be drafted after service verification or a revision request' })
 
       const { items, discountTotal } = req.body
@@ -86,6 +87,7 @@ export default async function handler(req, res) {
         comment: `Invoice (v${newVersion}) drafted by manager`
       })
 
+      await finalizeRequestWorkflow(request, { id: actorId, name: actorName, role: actorRole })
       await request.save()
       return res.status(200).json({ success: true, data: request })
     }
@@ -98,10 +100,10 @@ export default async function handler(req, res) {
 
       // Role authorization for invoice actions
       const invoiceRoles = {
-        'approve': ['admin', 'super_admin', 'accounts'],
-        'reject': ['admin', 'super_admin', 'accounts'],
-        'revise': ['admin', 'super_admin', 'accounts'],
-        'submit': ['manager', 'admin', 'super_admin', 'vendor']
+        'approve': ['super_admin', 'accounts'],
+        'reject': ['super_admin', 'accounts'],
+        'revise': ['super_admin', 'accounts'],
+        'submit': ['super_admin', 'vendor']
       }
       if (invoiceRoles[action]) {
         if (!invoiceRoles[action].includes(actorRole)) {
@@ -176,6 +178,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: 'Invalid action' })
       }
 
+      await finalizeRequestWorkflow(request, { id: actorId, name: actorName, role: actorRole })
       await request.save()
       return res.status(200).json({ success: true, data: request })
     }

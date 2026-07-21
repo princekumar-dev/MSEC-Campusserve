@@ -247,7 +247,7 @@ router.put('/:id/read', async (req, res) => {
   try {
     const { id } = req.params
 
-    const result = await markNotificationAsRead(id)
+    const result = await markNotificationAsRead(id, req.headers['x-user-email'])
 
     if (result.success) {
       res.json({ 
@@ -286,7 +286,10 @@ router.delete('/:id', async (req, res) => {
     const ObjectId = (await import('mongodb')).ObjectId
 
     const collection = db.collection('notifications')
-    const result = await collection.deleteOne({ _id: new ObjectId(id) })
+    const userEmail = String(req.headers['x-user-email'] || '').trim()
+    const query = { _id: new ObjectId(id) }
+    if (userEmail) query.userEmail = { $regex: `^${userEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' }
+    const result = await collection.deleteOne(query)
 
     if (result.deletedCount > 0) {
       res.json({ 
@@ -330,7 +333,9 @@ router.get('/', async (req, res, next) => {
 // Get notifications for a user (query param)
 router.get('/', async (req, res) => {
   try {
-    const { userEmail } = req.query
+    // Always prefer the authenticated request header. This prevents one user
+    // from reading another user's notifications by changing a query string.
+    const userEmail = req.headers['x-user-email'] || req.query.userEmail
     const limit = parseInt(req.query.limit) || 50
 
     if (!userEmail) {

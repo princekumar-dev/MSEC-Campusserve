@@ -12,7 +12,7 @@ const statusColors = {
   BLACKLISTED: 'bg-rose-50 text-rose-700 border-rose-200'
 }
 
-function VendorCard({ vendor, onAction }) {
+function VendorCard({ vendor, onAction, actionLoading }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-violet-200 transition-all group">
       <div className="p-6">
@@ -59,18 +59,18 @@ function VendorCard({ vendor, onAction }) {
 
         <div className="mt-4 flex gap-2">
           {vendor.status !== 'ACTIVE' && (
-            <button onClick={() => onAction(vendor._id, 'activate')} className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs py-2 rounded-lg border border-emerald-200 transition-all flex items-center justify-center space-x-1">
-              <CheckCircle size={12} /><span>Activate</span>
+            <button disabled={actionLoading} onClick={() => onAction(vendor._id, 'activate')} className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs py-2 rounded-lg border border-emerald-200 transition-all flex items-center justify-center space-x-1 disabled:cursor-wait disabled:opacity-60">
+              <CheckCircle size={12} /><span>{actionLoading ? 'Updating...' : 'Activate'}</span>
             </button>
           )}
           {vendor.status === 'ACTIVE' && (
-            <button onClick={() => onAction(vendor._id, 'deactivate')} className="flex-1 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs py-2 rounded-lg border border-slate-200 transition-all flex items-center justify-center space-x-1">
-              <XCircle size={12} /><span>Deactivate</span>
+            <button disabled={actionLoading} onClick={() => onAction(vendor._id, 'deactivate')} className="flex-1 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs py-2 rounded-lg border border-slate-200 transition-all flex items-center justify-center space-x-1 disabled:cursor-wait disabled:opacity-60">
+              <XCircle size={12} /><span>{actionLoading ? 'Updating...' : 'Deactivate'}</span>
             </button>
           )}
           {vendor.status !== 'BLACKLISTED' && (
-            <button onClick={() => onAction(vendor._id, 'blacklist')} className="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs py-2 rounded-lg border border-rose-200 transition-all flex items-center justify-center space-x-1">
-              <AlertTriangle size={12} /><span>Blacklist</span>
+            <button disabled={actionLoading} onClick={() => onAction(vendor._id, 'blacklist')} className="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs py-2 rounded-lg border border-rose-200 transition-all flex items-center justify-center space-x-1 disabled:cursor-wait disabled:opacity-60">
+              <AlertTriangle size={12} /><span>{actionLoading ? 'Updating...' : 'Blacklist'}</span>
             </button>
           )}
         </div>
@@ -139,6 +139,7 @@ export default function Vendors() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [showAdd, setShowAdd] = useState(false)
+  const [updatingVendorId, setUpdatingVendorId] = useState(null)
   const { showSuccess, showError } = useAlert()
   const auth = getAuthOrNull()
 
@@ -157,11 +158,18 @@ export default function Vendors() {
   useEffect(() => { fetchVendors() }, [fetchVendors])
 
   const handleAction = async (vendorId, action) => {
+    if (updatingVendorId) return
+    setUpdatingVendorId(vendorId)
     try {
       const res = await apiClient.post(`/api/vendors?id=${vendorId}&action=${action}`)
-      if (res.success) { showSuccess('Updated', `Vendor ${action}d successfully`); fetchVendors() }
+      if (res.success) {
+        setVendors(current => current.map(vendor => vendor._id === vendorId ? { ...vendor, ...res.data } : vendor))
+        const actionLabel = action === 'activate' ? 'activated' : action === 'deactivate' ? 'deactivated' : 'blacklisted'
+        showSuccess('Updated', `Vendor ${actionLabel} successfully`)
+      }
       else showError('Error', res.error)
     } catch (err) { showError('Error', err.message) }
+    finally { setUpdatingVendorId(null) }
   }
 
   const filtered = vendors.filter(v => {
@@ -261,7 +269,7 @@ export default function Vendors() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map(vendor => (
-            <VendorCard key={vendor._id} vendor={vendor} onAction={handleAction} />
+            <VendorCard key={vendor._id} vendor={vendor} onAction={handleAction} actionLoading={updatingVendorId === vendor._id} />
           ))}
         </div>
       )}

@@ -1,5 +1,6 @@
 import { connectToDatabase } from '../lib/mongo.js'
 import { ServiceRequest, User } from '../models.js'
+import { calculateSlaDueAt, finalizeRequestWorkflow } from '../lib/workflowEngine.js'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
@@ -22,6 +23,7 @@ export default async function handler(req, res) {
       if (id) {
         const request = await ServiceRequest.findById(id).lean()
         if (!request) return res.status(404).json({ success: false, error: 'Request not found' })
+        request.isEscalated = Boolean(request.slaDueAt && new Date(request.slaDueAt) < new Date() && !['CLOSED', 'REJECTED', 'CANCELLED'].includes(request.status))
         return res.status(200).json({ success: true, data: request })
       }
 
@@ -32,7 +34,7 @@ export default async function handler(req, res) {
       if (category) filter.category = category
 
       // Role-based filtering
-      if (userRole === 'requester') {
+      if (['requester', 'hod', 'staff'].includes(userRole)) {
         filter.requesterId = userId
       } else if (userRole === 'manager') {
         // Managers see their assigned requests, or approved requests waiting for assignment
@@ -45,7 +47,9 @@ export default async function handler(req, res) {
       }
 
       const requests = await ServiceRequest.find(filter).sort({ createdAt: -1 }).lean()
-      return res.status(200).json({ success: true, data: requests })
+      const now = Date.now()
+      const data = requests.map(item => ({ ...item, isEscalated: Boolean(item.slaDueAt && new Date(item.slaDueAt).getTime() < now && !['CLOSED', 'REJECTED', 'CANCELLED'].includes(item.status)) }))
+      return res.status(200).json({ success: true, data })
     }
 
     if (req.method === 'POST') {
@@ -57,10 +61,19 @@ export default async function handler(req, res) {
 
       // 1. Create New Request
       if (!action) {
-        const { title, category, location, assetCode, priority, emergencyReason, description, submitImmediately } = req.body
+        const { title, category, location, assetCode, priority, emergencyReason, requestedItem, requestedQuantity, requestedUnit, description, evidence, submitImmediately } = req.body
 
-        if (!title || !category || !location || !description) {
+        if (!title || !category || !location || !requestedItem || !description) {
           return res.status(400).json({ success: false, error: 'Missing required fields' })
+        }
+        if (!Number.isInteger(Number(requestedQuantity)) || Number(requestedQuantity) < 1) {
+          return res.status(400).json({ success: false, error: 'Quantity must be a whole number of 1 or more' })
+        }
+        const validEvidence = Array.isArray(evidence) ? evidence.filter(item =>
+          item?.name && typeof item.url === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(item.url)
+        ).slice(0, 1) : []
+        if (Array.isArray(evidence) && evidence.length > 0 && validEvidence.length === 0) {
+          return res.status(400).json({ success: false, error: 'The selected photo could not be saved. Use a JPG, PNG, or WebP image up to 2 MB.' })
         }
 
         const requester = await User.findById(actorId).lean()
@@ -80,8 +93,14 @@ export default async function handler(req, res) {
           assetCode,
           priority: priority || 'LOW',
           emergencyReason,
+          requestedItem: requestedItem.trim(),
+          requestedQuantity: Number(requestedQuantity),
+          requestedUnit: requestedUnit || 'pcs',
           description,
+          evidence: validEvidence.map(item => ({ ...item, uploadedBy: requester.name, uploadedByRole: userRole })),
           status,
+          currentOwnerRole: submitImmediately ? 'admin' : 'requester',
+          slaDueAt: calculateSlaDueAt(priority || 'LOW', status),
           requesterId: requester._id,
           requesterName: requester.name,
           requesterEmail: requester.email,
@@ -94,6 +113,7 @@ export default async function handler(req, res) {
           }]
         })
 
+        await finalizeRequestWorkflow(newRequest, { id: actorId, name: requester.name, role: userRole })
         await newRequest.save()
         return res.status(201).json({ success: true, data: newRequest })
       }
@@ -110,7 +130,7 @@ export default async function handler(req, res) {
 
       const oldStatus = request.status
 
-      const isAdmin = ['admin', 'super_admin'].includes(userRole)
+      const isAdmin = userRole === 'super_admin'
       const isOwner = String(request.requesterId) === String(actorId)
       const isAssignedManager = String(request.assignedManagerId || '') === String(actorId)
       const requireStatus = (allowedStatuses) => {
@@ -123,12 +143,14 @@ export default async function handler(req, res) {
 
       // Role-based authorization for privileged actions
       const privilegedActions = {
-        'approve': ['admin', 'super_admin'],
-        'reject': ['admin', 'super_admin'],
-        'clarify': ['admin', 'super_admin', 'manager'],
-        'assign-manager': ['admin', 'super_admin'],
-        'inspect': ['admin', 'super_admin', 'manager'],
-        'verify': ['requester', 'admin', 'super_admin']
+        'approve': ['super_admin'],
+        'reject': ['super_admin'],
+        'clarify': ['super_admin'],
+        'triage': ['admin', 'super_admin'],
+        'assign-manager': ['super_admin'],
+        'inspect': ['super_admin'],
+        'verify': ['requester', 'hod', 'staff', 'super_admin'],
+        'add-evidence': ['requester', 'hod', 'staff', 'super_admin', 'manager', 'technician', 'accounts']
       }
       if (privilegedActions[action]) {
         const allowed = privilegedActions[action]
@@ -232,6 +254,37 @@ export default async function handler(req, res) {
           comment: `Assigned to manager: ${manager.name}`
         })
       } 
+      else if (action === 'triage') {
+        const invalid = requireStatus(['SUBMITTED'])
+        if (invalid) return invalid
+        const { requirementType, managerId, note } = req.body
+        if (!['MAINTENANCE', 'REPLACEMENT', 'NEW_PURCHASE'].includes(requirementType)) {
+          return res.status(400).json({ success: false, error: 'Select maintenance, replacement, or new purchase' })
+        }
+        if (!managerId) return res.status(400).json({ success: false, error: 'Manager is required' })
+        const manager = await User.findById(managerId).lean()
+        if (!manager || manager.role !== 'manager' || manager.isActive === false) {
+          return res.status(404).json({ success: false, error: 'Select an active manager' })
+        }
+        request.adminAssessment = {
+          requirementType,
+          note: note?.trim() || '',
+          assessedBy: actorName,
+          assessedAt: new Date()
+        }
+        request.assignedManagerId = manager._id
+        request.assignedManagerName = manager.name
+        request.assignedManagerEmail = manager.email
+        request.status = 'ASSIGNED_TO_MANAGER'
+        request.currentOwnerRole = 'manager'
+        request.statusHistory.push({
+          oldStatus,
+          newStatus: 'ASSIGNED_TO_MANAGER',
+          actorId,
+          actorName,
+          comment: `Admin classified this as ${requirementType.replace(/_/g, ' ').toLowerCase()} and assigned manager ${manager.name}${note ? `. Note: ${note.trim()}` : ''}`
+        })
+      }
       else if (action === 'inspect') {
         const invalid = requireStatus(['ASSIGNED_TO_MANAGER'])
         if (invalid) return invalid
@@ -288,15 +341,30 @@ export default async function handler(req, res) {
           comment: `Requester verification: ${result}. Feedback: ${comment || 'None'}`
         })
       } 
+      else if (action === 'add-evidence') {
+        const { name, url, kind, note } = req.body
+        if (!name || !url) return res.status(400).json({ success: false, error: 'Evidence name and URL are required' })
+        const isImageData = /^data:image\/(jpeg|png|webp);base64,/.test(url)
+        let safeUrl = url
+        if (!isImageData) {
+          let parsed
+          try { parsed = new URL(url) } catch { return res.status(400).json({ success: false, error: 'Evidence must be an uploaded image or a valid link' }) }
+          if (!['https:', 'http:'].includes(parsed.protocol)) return res.status(400).json({ success: false, error: 'Evidence URL must use HTTP or HTTPS' })
+          safeUrl = parsed.toString()
+        }
+        request.evidence.push({ name: name.trim(), url: safeUrl, kind: kind || 'OTHER', note: note || '', uploadedBy: actorName, uploadedByRole: userRole })
+        request.statusHistory.push({ oldStatus, newStatus: oldStatus, actorId, actorName, comment: `Evidence attached: ${name.trim()}` })
+      }
       else {
         return res.status(400).json({ success: false, error: 'Invalid action' })
       }
 
+      await finalizeRequestWorkflow(request, { id: actorId, name: actorName, role: userRole })
       await request.save()
       return res.status(200).json({ success: true, data: request })
     }
 
-    // Delete or edit requests in draft status
+    // Edit drafts, clarification requests, or submitted requests during the first 24 hours
     if (req.method === 'PATCH') {
       const { id } = req.query
       if (!id) return res.status(400).json({ success: false, error: 'Request ID is required' })
@@ -304,25 +372,73 @@ export default async function handler(req, res) {
       const request = await ServiceRequest.findById(id)
       if (!request) return res.status(404).json({ success: false, error: 'Request not found' })
 
-      const isAdmin = ['admin', 'super_admin'].includes(userRole)
-      if (String(request.requesterId) !== String(userId) && !isAdmin) {
-        return res.status(403).json({ success: false, error: 'Only the requester or an administrator can edit this request' })
+      if (String(request.requesterId) !== String(userId)) {
+        return res.status(403).json({ success: false, error: 'Only the original requester can edit this request' })
       }
 
-      if (request.status !== 'DRAFT' && request.status !== 'CLARIFICATION_REQUIRED') {
-        return res.status(400).json({ success: false, error: 'Only drafts or requests needing clarification can be modified' })
+      const submittedAt = request.submittedAt || request.createdAt
+      const submittedWithin24Hours = request.status === 'SUBMITTED' &&
+        Date.now() - new Date(submittedAt).getTime() <= 24 * 60 * 60 * 1000
+      if (!['DRAFT', 'CLARIFICATION_REQUIRED'].includes(request.status) && !submittedWithin24Hours) {
+        return res.status(400).json({ success: false, error: 'Submitted requests can only be edited within 24 hours of submission' })
       }
 
-      const updates = req.body
-      delete updates.status
-      delete updates.requestNumber
-      delete updates.requesterId
-      delete updates.statusHistory
-
-      Object.assign(request, updates)
+      const allowedFields = ['title', 'category', 'location', 'assetCode', 'priority', 'emergencyReason', 'requestedItem', 'requestedQuantity', 'requestedUnit', 'description']
+      allowedFields.forEach(field => {
+        if (Object.prototype.hasOwnProperty.call(req.body, field)) request[field] = req.body[field]
+      })
+      if (Array.isArray(req.body.evidence) && req.body.evidence.length > 0) {
+        const uploadedPhoto = req.body.evidence.find(item =>
+          item?.name && typeof item.url === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(item.url)
+        )
+        if (!uploadedPhoto) {
+          return res.status(400).json({ success: false, error: 'The selected photo could not be saved. Use a JPG, PNG, or WebP image up to 2 MB.' })
+        }
+        const existingNonIssueEvidence = request.evidence.filter(item => item.kind !== 'ISSUE_PHOTO')
+        request.evidence = [
+          ...existingNonIssueEvidence,
+          {
+            name: uploadedPhoto.name.trim(),
+            url: uploadedPhoto.url,
+            kind: 'ISSUE_PHOTO',
+            note: uploadedPhoto.note || 'Attached from the request form',
+            uploadedBy: req.user?.name || request.requesterName,
+            uploadedByRole: userRole
+          }
+        ]
+      }
+      if (!request.title?.trim() || !request.category || !request.location?.trim() || !request.requestedItem?.trim() || !request.description?.trim()) {
+        return res.status(400).json({ success: false, error: 'Missing required fields' })
+      }
+      if (!Number.isInteger(Number(request.requestedQuantity)) || Number(request.requestedQuantity) < 1) {
+        return res.status(400).json({ success: false, error: 'Quantity must be a whole number of 1 or more' })
+      }
+      request.statusHistory.push({
+        oldStatus: request.status,
+        newStatus: request.status,
+        actorId: userId,
+        actorName: req.user?.name || 'Requester',
+        comment: 'Request details edited'
+      })
       await request.save()
 
       return res.status(200).json({ success: true, data: request })
+    }
+
+    // Only the original requester may permanently delete their own request.
+    if (req.method === 'DELETE') {
+      const { id } = req.query
+      if (!id) return res.status(400).json({ success: false, error: 'Request ID is required' })
+
+      const request = await ServiceRequest.findById(id)
+      if (!request) return res.status(404).json({ success: false, error: 'Request not found' })
+
+      if (String(request.requesterId) !== String(userId)) {
+        return res.status(403).json({ success: false, error: 'Only the original requester can delete this request' })
+      }
+
+      await ServiceRequest.deleteOne({ _id: request._id })
+      return res.status(200).json({ success: true, message: 'Request deleted successfully' })
     }
 
     return res.status(405).json({ success: false, error: 'Method not allowed' })

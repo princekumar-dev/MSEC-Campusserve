@@ -1,5 +1,6 @@
 import { connectToDatabase } from '../lib/mongo.js'
-import { ServiceRequest, User } from '../models.js'
+import { ServiceRequest, PurchaseOrder, User } from '../models.js'
+import { finalizeRequestWorkflow } from '../lib/workflowEngine.js'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
@@ -18,11 +19,76 @@ export default async function handler(req, res) {
   const actorRole = req.user ? req.user.role : (req.headers['x-user-role'] || '')
 
   try {
+    // List quotations. Quotations are stored as subdocuments on service requests,
+    // so expose a flat collection for the manager quotations screen.
+    if (req.method === 'GET' && !action && !id && !requestId) {
+      const query = {}
+
+      // Managers may only see quotations belonging to requests assigned to them.
+      // Administrative oversight roles can see the complete quotation register.
+      if (actorRole === 'manager') query.assignedManagerId = actorId
+      else if (!['admin', 'super_admin'].includes(actorRole)) {
+        return res.status(403).json({ success: false, error: 'You do not have permission to view quotations' })
+      }
+
+      const requests = await ServiceRequest.find(query)
+        .select('requestNumber title requesterName assignedManagerId assignedManagerName quotation createdAt')
+        .sort({ 'quotation.approvedAt': -1, createdAt: -1 })
+        .lean()
+
+      // Older POs may predate quotation snapshots. Include them as vendor-price
+      // quotations so existing records are visible without data recreation.
+      const requestIds = requests.map(request => request._id)
+      const purchaseOrders = requestIds.length
+        ? await PurchaseOrder.find({ requestId: { $in: requestIds } }).sort({ createdAt: -1 }).lean()
+        : []
+      const poByRequest = new Map(purchaseOrders.map(po => [String(po.requestId), po]))
+
+      const quotations = requests.map(request => {
+        const po = poByRequest.get(String(request._id))
+        const quotation = request.quotation?.quotationNumber ? request.quotation : (po ? {
+          quotationNumber: String(po.poNumber || '').replace(/^PO-/, 'QUO-'),
+          version: 1,
+          status: 'APPROVED',
+          subtotal: po.subtotal,
+          taxTotal: po.taxTotal,
+          discountTotal: po.discountTotal,
+          additionalCharges: po.deliveryCharge,
+          grandTotal: po.grandTotal,
+          validUntil: po.expectedDeliveryDate,
+          terms: po.paymentTerms,
+          createdBy: po.vendorName,
+          approvedBy: po.createdBy,
+          approvedAt: po.createdAt,
+          items: (po.items || []).map(item => ({
+            itemType: 'MATERIAL', description: item.description,
+            quantity: item.quantityOrdered, unit: item.unit,
+            unitPrice: item.unitPrice, taxRate: item.taxRate,
+            discount: item.discount, lineTotal: item.lineTotal
+          }))
+        } : null)
+        if (!quotation) return null
+        return {
+        ...quotation,
+        _id: request._id,
+        requestId: request._id,
+        requestNumber: request.requestNumber,
+        requestTitle: request.title,
+        requesterName: request.requesterName,
+        assignedManagerId: request.assignedManagerId,
+        assignedManagerName: request.assignedManagerName,
+        vendorName: quotation.createdBy || 'CampusServe quotation',
+        createdAt: request.createdAt
+      }}).filter(Boolean)
+
+      return res.status(200).json({ success: true, data: quotations })
+    }
+
     // 1. Create or Revise Quotation (updates subdocument)
     if (req.method === 'POST' && !action && requestId) {
       const request = await ServiceRequest.findById(requestId)
       if (!request) return res.status(404).json({ success: false, error: 'Request not found' })
-      if (!['manager', 'admin', 'super_admin'].includes(actorRole)) return res.status(403).json({ success: false, error: 'Only a manager or administrator can draft a quotation' })
+      if (actorRole !== 'super_admin') return res.status(403).json({ success: false, error: 'Managers generate purchase orders directly for assigned requests' })
       if (!['QUOTATION_IN_PROGRESS', 'QUOTATION_REVISION_REQUIRED'].includes(request.status)) return res.status(409).json({ success: false, error: 'A quotation can only be drafted after inspection or a revision request' })
 
       const { items, terms, validUntil } = req.body
@@ -95,6 +161,7 @@ export default async function handler(req, res) {
         comment: `Quotation (v${newVersion}) created as draft`
       })
 
+      await finalizeRequestWorkflow(request, { id: actorId, name: actorName, role: actorRole })
       await request.save()
       return res.status(200).json({ success: true, data: request })
     }
@@ -107,10 +174,10 @@ export default async function handler(req, res) {
 
       // Role authorization for quotation actions
       const quotationRoles = {
-        'approve': ['admin', 'super_admin'],
-        'reject': ['admin', 'super_admin'],
-        'revise': ['admin', 'super_admin'],
-        'submit': ['manager', 'admin', 'super_admin']
+        'approve': ['super_admin'],
+        'reject': ['super_admin'],
+        'revise': ['super_admin'],
+        'submit': ['super_admin']
       }
       if (quotationRoles[action]) {
         if (!quotationRoles[action].includes(actorRole)) {
@@ -185,6 +252,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: 'Invalid action' })
       }
 
+      await finalizeRequestWorkflow(request, { id: actorId, name: actorName, role: actorRole })
       await request.save()
       return res.status(200).json({ success: true, data: request })
     }

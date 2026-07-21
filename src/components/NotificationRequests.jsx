@@ -595,9 +595,9 @@ export default function NotificationRequests({ isOpen, onClose, setUnreadCount }
           className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-theme-gold/10 to-theme-gold/5">
+          <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-violet-100 bg-gradient-to-r from-violet-50 to-violet-100/60">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-theme-gold-gradient flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center">
                 <Bell className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -627,7 +627,7 @@ export default function NotificationRequests({ isOpen, onClose, setUnreadCount }
           <div className="flex-1 overflow-y-auto p-4 sm:p-6">
             {loading ? (
               <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-theme-gold"></div>
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-violet-600"></div>
               </div>
             ) : requests.length === 0 ? (
               <div className="text-center py-12">
@@ -670,9 +670,9 @@ export default function NotificationRequests({ isOpen, onClose, setUnreadCount }
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-theme-gold/10 to-theme-gold/5">
+          <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-violet-100 bg-gradient-to-r from-violet-50 to-violet-100/60">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-theme-gold-gradient flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center">
                 <Clock className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -693,7 +693,7 @@ export default function NotificationRequests({ isOpen, onClose, setUnreadCount }
           <div className="flex-1 overflow-y-auto p-4 sm:p-6">
             {loading ? (
               <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-theme-gold"></div>
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-violet-600"></div>
               </div>
             ) : (
               <div className="space-y-4">
@@ -834,9 +834,9 @@ export default function NotificationRequests({ isOpen, onClose, setUnreadCount }
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-theme-gold/10 to-theme-gold/5">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-violet-100 bg-gradient-to-r from-violet-50 to-violet-100/60">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-theme-gold-gradient flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center">
               <Clock className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -859,7 +859,7 @@ export default function NotificationRequests({ isOpen, onClose, setUnreadCount }
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-theme-gold"></div>
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-violet-600"></div>
             </div>
           ) : requests.length === 0 ? (
             <div className="text-center py-12">

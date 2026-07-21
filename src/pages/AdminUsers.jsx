@@ -48,7 +48,8 @@ function AdminUsers() {
         showSuccess('Created', 'User created successfully')
         setShowCreateModal(false)
         setNewUser({ name: '', email: '', password: '', role: 'requester', department: '', phoneNumber: '' })
-        fetchUsers()
+        if (res.user) setUsers(current => [...current, res.user])
+        else fetchUsers()
       } else {
         showError('Error', res.error || 'Failed to create user')
       }
@@ -62,10 +63,10 @@ function AdminUsers() {
   const handleDeleteUser = async (userId) => {
     if (!confirm('Are you sure you want to delete this user?')) return
     try {
-      const res = await apiClient.delete(`/api/users?id=${userId}`, { userId: auth.id })
+      const res = await apiClient.del(`/api/users?id=${userId}`, { body: { userId: auth.id } })
       if (res.success) {
         showSuccess('Deleted', 'User removed')
-        fetchUsers()
+        setUsers(current => current.filter(user => user.id !== userId && user._id !== userId))
       }
     } catch (err) {
       showError('Error', 'Failed to delete user')

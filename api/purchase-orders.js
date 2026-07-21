@@ -1,5 +1,5 @@
 import { connectToDatabase } from '../lib/mongo.js'
-import { PurchaseOrder, Vendor, User } from '../models.js'
+import { PurchaseOrder, Vendor, User, ServiceRequest } from '../models.js'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
@@ -30,6 +30,7 @@ export default async function handler(req, res) {
       const filter = {}
       if (req.query.status) filter.status = req.query.status
       if (req.query.vendorId) filter.vendorId = req.query.vendorId
+      if (req.query.requestId) filter.requestId = req.query.requestId
       if (userRole === 'vendor') {
         // Vendors see their own POs only
         const vendorDocs = await Vendor.find({ email: actor?.email }).lean()
@@ -41,6 +42,9 @@ export default async function handler(req, res) {
 
     // ── POST /api/purchase-orders — Create PO ─────────────────────────────────
     if (req.method === 'POST' && !id) {
+      if (!['manager', 'super_admin'].includes(userRole)) {
+        return res.status(403).json({ success: false, error: 'Only the assigned manager can generate a purchase order' })
+      }
       const { vendorId, requestId, items, deliveryAddress, deliveryLocation, expectedDeliveryDate, paymentTerms, warrantyTerms, notes, deliveryCharge } = req.body
       if (!vendorId || !items || !items.length || !deliveryAddress) {
         return res.status(400).json({ success: false, error: 'vendorId, items, and deliveryAddress are required' })
@@ -48,6 +52,25 @@ export default async function handler(req, res) {
       const vendor = await Vendor.findById(vendorId).lean()
       if (!vendor) return res.status(404).json({ success: false, error: 'Vendor not found' })
       if (vendor.status !== 'ACTIVE') return res.status(400).json({ success: false, error: 'Vendor is not active' })
+      let serviceRequest = null
+      if (requestId) {
+        serviceRequest = await ServiceRequest.findById(requestId)
+        if (!serviceRequest) return res.status(404).json({ success: false, error: 'Service request not found' })
+        if (userRole === 'manager' && String(serviceRequest.assignedManagerId) !== String(actorId)) {
+          return res.status(403).json({ success: false, error: 'This request is not assigned to you' })
+        }
+        const existingPo = await PurchaseOrder.findOne({ requestId }).lean()
+        // Creating a PO for a request is idempotent. A repeated click or page
+        // refresh should open the existing record instead of surfacing a 409.
+        if (existingPo) {
+          return res.status(200).json({
+            success: true,
+            data: existingPo,
+            existing: true,
+            message: `Purchase order ${existingPo.poNumber} already exists for this request`
+          })
+        }
+      }
 
       // Calculate totals
       let subtotal = 0, taxTotal = 0, discountTotal = 0
@@ -78,6 +101,13 @@ export default async function handler(req, res) {
         statusHistory: [{ oldStatus: '', newStatus: 'DRAFT', actorId, actorName, comment: 'PO created as draft', createdAt: new Date() }]
       })
       await po.save()
+      if (serviceRequest) {
+        const previousStatus = serviceRequest.status
+        serviceRequest.status = 'PURCHASE_ORDER_CREATED'
+        serviceRequest.currentOwnerRole = null
+        serviceRequest.statusHistory.push({ oldStatus: previousStatus, newStatus: 'PURCHASE_ORDER_CREATED', actorId, actorName, comment: `Purchase order ${po.poNumber} generated` })
+        await serviceRequest.save()
+      }
       return res.status(201).json({ success: true, data: po })
     }
 

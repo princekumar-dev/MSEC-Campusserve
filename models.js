@@ -26,6 +26,15 @@ const ServiceRequestSchema = new mongoose.Schema({
   assetCode: { type: String },
   priority: { type: String, enum: ['LOW', 'MEDIUM', 'HIGH', 'EMERGENCY'], default: 'LOW' },
   emergencyReason: { type: String },
+  requestedItem: { type: String },
+  requestedQuantity: { type: Number, min: 1 },
+  requestedUnit: { type: String, default: 'pcs' },
+  adminAssessment: {
+    requirementType: { type: String, enum: ['MAINTENANCE', 'REPLACEMENT', 'NEW_PURCHASE'] },
+    note: { type: String },
+    assessedBy: { type: String },
+    assessedAt: { type: Date }
+  },
   description: { type: String, required: true },
   status: { 
     type: String, 
@@ -43,6 +52,18 @@ const ServiceRequestSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   submittedAt: { type: Date },
   closedAt: { type: Date },
+  currentOwnerRole: { type: String },
+  slaDueAt: { type: Date },
+  isEscalated: { type: Boolean, default: false },
+  evidence: [{
+    name: { type: String, required: true },
+    url: { type: String, required: true },
+    kind: { type: String, enum: ['ISSUE_PHOTO', 'QUOTATION', 'WORK_PHOTO', 'INVOICE', 'RECEIPT', 'OTHER'], default: 'OTHER' },
+    note: { type: String },
+    uploadedBy: { type: String },
+    uploadedByRole: { type: String },
+    createdAt: { type: Date, default: Date.now }
+  }],
   
   statusHistory: [{
     oldStatus: { type: String },
@@ -171,11 +192,11 @@ const ServiceRequestSchema = new mongoose.Schema({
   }]
 })
 
-ServiceRequestSchema.index({ requestNumber: 1 })
 ServiceRequestSchema.index({ status: 1 })
 ServiceRequestSchema.index({ requesterId: 1 })
 ServiceRequestSchema.index({ assignedManagerId: 1 })
 ServiceRequestSchema.index({ 'workOrder.technicianId': 1 })
+ServiceRequestSchema.index({ currentOwnerRole: 1, slaDueAt: 1 })
 
 // Notification Schema
 const NotificationSchema = new mongoose.Schema({
